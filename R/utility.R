@@ -77,3 +77,125 @@ ginv <- RTMB::ADjoint(function(X) {
     dim(Y) <- dim(dY) <- c(n,n)
     -t(Y)%*%dY%*%t(Y)
 }, name="ginv")
+
+#' @title Elementwise product of sparse and dense matrices
+#' @description Calculate elementwise product of sparse and dense matrices
+#' @param Msparse sparse matrix
+#' @param Mdense dense matrix
+#' @export
+elementwise_product = function(Msparse, Mdense){
+  "c" <- ADoverload("c")
+  "[<-" <- ADoverload("[<-")
+  if(!("p" %in% names(attributes(Msparse)))) browser()
+  if(length(Msparse@x)>0){
+    Mout = Msparse
+    j = rep( seq_len(nrow(Msparse)), times=diff(Msparse@p) )
+    Mout@x = Msparse@x + Mdense[cbind(Msparse@i+1, j)]
+  }else{
+    Mout = Matrix::sparseMatrix(i=1, j=1, x=0)
+  }
+  return(Mout)
+}
+
+#' @export
+adsparse_to_matrix = function(x){
+  "c" <- ADoverload("c")
+  "[<-" <- ADoverload("[<-")
+  y = matrix(0, nrow=nrow(x), ncol=ncol(x))
+  j = rep( seq_len(nrow(x)), times=diff(x@p) )
+  y[cbind(x@i+1, j)] = x@x
+  y
+}
+
+#' @title Dirichlet-multinomial
+#' @description Allows data-weighting as parameter
+#' @examples
+#' library(RTMB)
+#' prob = rep(0.1,10)
+#' x = rmultinom( n=1, prob=prob, size=20 )[,1]
+#' f = function( ln_theta ) ddirmult(x, prob, ln_theta)
+#' f( 0 )
+#' F = MakeTape(f, 0)
+#' F$jacfun()(0)
+#'
+#' @export
+ddirmult <-
+function( x,
+          prob,
+          ln_theta,
+          log=TRUE ){
+
+  # Pre-processing
+  "c" <- ADoverload("c")
+  "[<-" <- ADoverload("[<-")
+  Ntotal = sum(x)
+  p_exp = prob / sum(prob)
+  p_obs = x / Ntotal
+  dirichlet_Parm = exp(ln_theta) * Ntotal
+  logres = 0.0
+
+  # https://github.com/nmfs-stock-synthesis/stock-synthesis/blob/main/SS_objfunc.tpl#L306-L314
+  # https://github.com/James-Thorson/CCSRA/blob/master/inst/executables/CCSRA_v8.cpp#L237-L242
+  # https://www.sciencedirect.com/science/article/pii/S0165783620303696
+
+  # 1st term -- integration constant that could be dropped
+  logres = logres + lgamma( Ntotal+1 )
+  for( index in seq_along(x) ){
+    logres = logres - lgamma( Ntotal*p_obs[index] + 1.0 )
+  }
+
+  # 2nd term in formula
+  logres = logres + lgamma( dirichlet_Parm ) - lgamma( Ntotal+dirichlet_Parm )
+
+  # Summation in 3rd term
+  for( index in seq_along(x) ){
+    logres = logres + lgamma( Ntotal*p_obs[index] + dirichlet_Parm*p_exp[index] )
+    logres = logres - lgamma( dirichlet_Parm * p_exp[index] )
+  }
+  if(log){ return(logres) }else{ return(exp(logres)) }
+}
+
+combine_groups <-
+function( taxa_list,
+          B,
+          PB,
+          QB,
+          DC ){
+
+  # Aggregate rates
+  PB_i = sapply( taxa_list, FUN=\(x){
+               if(length(x)==1){
+                 PB[match(x,names(PB))]
+               }else{
+                 weighted.mean(x=PB[match(x,names(PB))], w=B[match(x,names(B))], na.rm=TRUE)
+               }
+             } )
+  QB_i = sapply( taxa_list, FUN=\(x){
+               if(length(x)==1){
+                 QB[match(x,names(PB))]
+               }else{
+                 weighted.mean(x=QB[match(x,names(QB))], w=B[match(x,names(B))])
+               }
+             } )
+  B_i = sapply( taxa_list, FUN=\(x){
+               sum(B[match(x,names(B))],na.rm=TRUE)
+             } )
+  names(PB_i) = names(QB_i) = names(taxa_list)
+
+  # Aggregate diet matrix
+  DC2 = t(sapply( taxa_list, FUN=\(x){
+               colSums(DC[match(x,rownames(DC)),,drop=FALSE],na.rm=TRUE)
+             } ))
+  DC_ij = sapply( taxa_list, FUN=\(x){
+               w = B[match(x,names(B))]
+               rowSums(DC2[,match(x,colnames(DC2)),drop=FALSE] * outer(rep(1,nrow(DC2)),w) / sum(w), na.rm=TRUE )
+             } )
+
+  out = list(
+    PB_i = PB_i,
+    QB_i = QB_i,
+    B_i = B_i,
+    DC_ij = DC_ij
+  )
+  return(out)
+}

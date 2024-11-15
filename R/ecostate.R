@@ -37,11 +37,25 @@
 #'        to equilibrium biomass is estimated as a fixed effect
 #' @param fit_eps Character-vector listing \code{taxa} for which the
 #'        model should estimate annual process errors in dB/dt
+#' @param fit_PB Character-vector listing \code{taxa} for which equilibrium
+#'        production per biomass is estimated.  Note that it is likely
+#'        a good idea to include a prior for any species for which this is estimated.
+#' @param fit_QB Character-vector listing \code{taxa} for which equilibrium
+#'        consumption per biomass is estimated.  Note that it is likely
+#'        a good idea to include a prior for any species for which this is estimated.
+#' @param log_prior A user-provided function that takes as input the list of
+#'        parameters \code{out$obj$env$parList()} where \code{out} is the output from
+#'        \code{ecostate()}, and returns a numeric vector
+#'        where the sum is the log-prior probability.  For example
+#'        \code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
+#'        specifies a lognormal prior probability for the catchability coefficient
+#'        for the first \code{taxa} with logmean of zero and logsd of 0.1
 #' @param control Output from [ecostate_control()], used to define user
 #'        settings.
 #'
 #' @importFrom TMB config
-#' @importFrom checkmate assertDouble assertFactor assertCharacter
+#' @importFrom checkmate assertDouble assertFactor assertCharacter assertList
+#' @importFrom Matrix Matrix Diagonal sparseMatrix
 #'
 #' @details
 #' All \code{taxa} must be included in \code{QB}, \code{PB}, \code{B}, and \code{DC},
@@ -53,8 +67,10 @@
 ecostate <-
 function( taxa,
           years,
-          catch,
-          biomass,
+          catch = data.frame("Year"=numeric(0),"Mass"=numeric(0),"Taxon"=numeric(0)),
+          biomass = data.frame("Year"=numeric(0),"Mass"=numeric(0),"Taxon"=numeric(0)),
+          agecomp = list(),
+          weight = list(),
           PB,
           QB,
           B,
@@ -67,10 +83,20 @@ function( taxa,
           fit_Q = vector(),
           fit_B0 = vector(),
           fit_EE = vector(),
+          fit_PB = vector(),
+          fit_QB = vector(),
           fit_eps = vector(),
+          fit_nu = vector(),
+          fit_phi = vector(),
+          log_prior = function(p) 0,
+          settings = stanza_settings(taxa=taxa),
           control = ecostate_control() ){
 
-  # 
+  # Necessary in packages
+  "c" <- ADoverload("c")
+  "[<-" <- ADoverload("[<-")
+
+  #
   start_time = Sys.time()
   if( !all(c(fit_B,fit_Q,fit_B0,fit_eps,fit_EE) %in% taxa) ){
     if(isFALSE(control$silent)) warning("Some `fit_B`, `fit_Q`, `fit_B0`, or `fit_eps` not in `taxa`")
@@ -100,7 +126,7 @@ function( taxa,
   if(!all(taxa %in% names(EE))) stop("Check names for `EE`")
   if(!all(taxa %in% names(type))) stop("Check names for `type`")
   if(!all(taxa %in% names(U))) stop("Check names for `U`")
-  logPB_i = log(PB[taxa])
+  logPB_i = array( log(PB[taxa]), dimnames=list(taxa) )
   logQB_i = log(QB[taxa])
   logB_i = log(B[taxa])
   DC_ij = DC[taxa,taxa,drop=FALSE]
@@ -130,9 +156,11 @@ function( taxa,
   # Indicators 
   which_primary = which( type_i=="auto" )
   which_detritus = which( type_i=="detritus" )
+  which_multigroup = match( settings$multigroup_taxa, settings$taxa )
   noB_i = ifelse( is.na(logB_i), 1, 0 )
-  
-  if(any(is.na(c(logPB_i,logQB_i[-c(which_primary,which_detritus)],DC_ij)))){
+  noB_i[which_multigroup] = 0
+
+  if(any(is.na(c(logPB_i,logQB_i[-c(which_primary,which_detritus,which_multigroup)],DC_ij)))){
     stop("Check `PB` `QB` and `DC` for NAs or `taxa` that are not provided")
   }
   
@@ -142,6 +170,9 @@ function( taxa,
   }
   colsums = colSums(DC_ij)
   DC_ij = DC_ij / outer( rep(1,nrow(DC_ij)), ifelse(colsums==0,1,colsums) )
+  
+  # Convert to sparse diet matrix
+  #DC_ij = Matrix::Matrix(DC_ij)
   
   # Convert long-form `catch` to wide-form Cobs_ti
   Cobs_ti = tapply( catch[,'Mass'], FUN=mean, INDEX = list(
@@ -157,7 +188,24 @@ function( taxa,
                     factor(biomass[,'Taxon'],levels=taxa) )
                   )
   
+  #
+  assertList( agecomp )
+  Nobs_ta_g2 = agecomp[match(names(agecomp),settings$unique_stanza_groups)]  # match works for empty list
+  # ADD MORE CHECKS
+
+  #
+  assertList( weight )
+  Wobs_ta_g2 = weight[match(names(weight),settings$unique_stanza_groups)]  # match works for empty list
+
+  #
+  stanza_data = make_stanza_data( settings )
+
+  # number of selex params
+  n_selex = length(Nobs_ta_g2) # * switch( settings$comp_weight, "multinom" = 2, "dir" = 3, "dirmult" = 3 )
+  n_weight = length(Wobs_ta_g2)
+
   # parameter list
+  #browser()
   p = list( delta_i = rep(log(1), n_species),
             ln_sdB = log(0.1), 
             ln_sdC = log(0.1),
@@ -169,26 +217,54 @@ function( taxa,
             Xprime_ij = Xprime_ij,
             DC_ij = DC_ij,
             logtau_i = rep(NA, n_species),
+            logsigma_i = rep(NA, n_species),
+            logpsi_g2 = rep(NA, settings$n_g2),
             epsilon_ti = array( 0, dim=c(0,n_species) ),
             alpha_ti = array( 0, dim=c(0,n_species) ),
+            nu_ti = array( 0, dim=c(0,n_species) ),
+            phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
-            logq_i = rep( log(1), n_species) )      # , PB_i=PB_i
+            logq_i = rep( log(1), n_species),
+            s50_z = rep(1, n_selex),
+            srate_z = rep(1, n_selex),
+            compweight_z = rep(1, n_selex*ifelse(settings$comp_weight=="multinom",0,1)),
+            #selex_z = rep(1, n_selex),  # CHANGE WITH NUMBER OF PARAMETERS
+            log_winf_z = rep(0, n_weight),
+            ln_sdW_z = rep(0, n_weight),
+            SpawnX_g2 = stanza_data$stanzainfo_g2z[,'SpawnX'],
+            log_K_g2 = log(stanza_data$stanzainfo_g2z[,'K']),
+            logit_d_g2 = qlogis(stanza_data$stanzainfo_g2z[,'d']),
+            Wmat_g2 = stanza_data$stanzainfo_g2z[,'Wmat']
+  )      # , PB_i=PB_i
 
   # 
   map = list()
   
-  # 
-  map$logPB_i = factor( rep(NA,n_species) )
-  map$logQB_i = factor( rep(NA,n_species) )
+  # map these off by default
   map$U_i = factor( rep(NA,n_species) )
   map$DC_ij = factor( array(NA,dim=dim(p$DC_ij)) )
   map$Xprime_ij = factor( array(NA,dim=dim(p$Xprime_ij)) )
-  
-  # 
-  #p$logtau_i = ifelse(taxa %in% fit_eps, log(0.01)+logB_i, NA)
+  map$SpawnX_g2 = factor( rep(NA,length(p$SpawnX_g2)) )
+  map$Wmat_g2 = factor( rep(NA,length(p$Wmat_g2)) )
+
+  # map these off based on options
+  map$logQB_i = factor( ifelse(taxa %in% fit_QB, seq_len(n_species), NA) )
+  map$logPB_i = factor( ifelse(taxa %in% fit_PB, seq_len(n_species), NA) )
+  map$log_K_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_K, seq_len(settings$n_g2), NA)) #  factor( rep(NA,length(p$K_g2)) )
+  map$logit_d_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_d, seq_len(settings$n_g2), NA)) #  factor( rep(NA,length(p$K_g2)) )
+
+  #
   p$logtau_i = ifelse(taxa %in% fit_eps, log(control$start_tau), NA)
   map$logtau_i = factor(ifelse(taxa %in% fit_eps, seq_len(n_species), NA))
   
+  #
+  p$logsigma_i = ifelse(taxa %in% fit_nu, log(control$start_tau), NA)
+  map$logsigma_i = factor(ifelse(taxa %in% fit_nu, seq_len(n_species), NA))
+
+  #
+  p$logpsi_g2 = ifelse(settings$unique_stanza_groups %in% fit_phi, log(control$start_tau), NA)
+  map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% fit_phi, seq_len(settings$n_g2), NA))
+
   # Catches
   map$logF_ti = factor( ifelse(is.na(Cobs_ti), NA, seq_len(prod(dim(Cobs_ti)))) )
   p$logF_ti[] = ifelse(is.na(Cobs_ti), -Inf, log(0.01))
@@ -203,7 +279,7 @@ function( taxa,
   if( control$process_error == "epsilon" ){
     p$epsilon_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
     map$epsilon_ti = array( seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
-    for(i in 1:n_species){
+    for(i in seq_len(n_species)){
       if( is.na(p$logtau_i[i]) ){
         p$epsilon_ti[,i] = 0
         map$epsilon_ti[,i] = NA
@@ -213,7 +289,7 @@ function( taxa,
   }else{
     p$alpha_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
     map$alpha_ti = array( seq_len(prod(dim(p$alpha_ti))), dim=dim(p$alpha_ti))
-    for(i in 1:n_species){
+    for(i in seq_len(n_species)){
       if( is.na(p$logtau_i[i]) ){
         p$alpha_ti[,i] = 0
         map$alpha_ti[,i] = NA
@@ -221,7 +297,27 @@ function( taxa,
     }
     map$alpha_ti = factor(map$alpha_ti)
   }
-  
+  # Variation in consumption
+  p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+  map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
+  for(i in seq_len(n_species)){
+    if( is.na(p$logsigma_i[i]) ){
+      p$nu_ti[,i] = 0
+      map$nu_ti[,i] = NA
+    }
+  }
+  map$nu_ti = factor(map$nu_ti)
+  # Variation in recruitment
+  p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
+  map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
+  for(g2 in seq_len(settings$n_g2)){
+    if( is.na(p$logpsi_g2[g2]) ){
+      p$phi_tg2[,g2] = 0
+      map$phi_tg2[,g2] = NA
+    }
+  }
+  map$phi_tg2 = factor(map$phi_tg2)
+
   # Measurement errors
   p$ln_sdB = log(0.1)
   map$ln_sdB = factor(NA)
@@ -249,12 +345,17 @@ function( taxa,
     message("Using `control$map`, so be cautious in constructing it")
     map = control$map
   }
-  
+
   # Load data in environment for function "compute_nll"
   data = local({
                   Bobs_ti = Bobs_ti
                   Cobs_ti = Cobs_ti
-                  n_steps = control$n_steps 
+                  Nobs_ta_g2 = Nobs_ta_g2
+                  Wobs_ta_g2 = Wobs_ta_g2
+                  years = years
+                  #DC_ij = DC_ij
+                  control = control
+                  #n_steps = control$n_steps
                   if( control$integration_method == "ABM"){
                     project_vars = abm3pc_sys 
                   }else if( control$integration_method =="RK4"){
@@ -264,13 +365,20 @@ function( taxa,
                       myode( f, a, b, y0, n, Pars, method=control$integration_method )
                     }
                   }
-                  F_type = control$F_type
+                  #F_type = control$F_type
                   n_species = n_species
                   noB_i = noB_i
-                  scale_solver = control$scale_solver
-                  inverse_method = control$inverse_method
+                  #scale_solver = control$scale_solver
+                  #inverse_method = control$inverse_method
                   type_i = type_i
-                  process_error = control$process_error
+                  #process_error = control$process_error
+                  #sdreport_detail = control$sdreport_detail
+                  settings = settings
+                  stanza_data = stanza_data
+                  taxa = taxa
+                  fit_eps = fit_eps
+                  fit_nu = fit_nu
+                  log_prior = log_prior
                   environment()
   })
   environment(compute_nll) <- data
@@ -283,9 +391,26 @@ function( taxa,
                   environment()
   })
   environment(dBdt) <- data2
-  
+  environment(project_stanzas) <- data2    # project_stanzas(.) calls dBdt(.)
+
+  # 
+  #data3 = local({
+  #                DC_ij = DC_ij
+  #                environment()
+  #})
+  #environment(add_equilibrium) <- data3
+
+  # Load data in environment for function "dBdt"
+  data4 = local({
+                  "c" <- ADoverload("c")
+                  "[<-" <- ADoverload("[<-")
+                  environment()
+  })
+  environment(log_prior) <- data4
+
   # Make TMB object
   #browser()
+  # compute_nll(p)
   # environment(compute_nll) <- data
   obj <- MakeADFun( func = compute_nll, 
                     parameters = p,
@@ -293,39 +418,66 @@ function( taxa,
                     random = control$random,
                     profile = control$profile,
                     silent = control$silent )
-  
+  #traceback(max=20)
+  #obj$fn(obj$par)
+
   # Optimize
   opt = list( "par"=obj$par )
   for( i in seq_len(max(0,control$nlminb_loops)) ){
     if( isFALSE(control$quiet) ) message("Running nlminb_loop #", i)
     opt = nlminb( start = opt$par,
                   objective = obj$fn,
-                  gradient = obj$gr,
+                  gradient = list(obj$gr,NULL)[[ifelse(control$use_gradient,1,2)]],
                   control = list( eval.max = control$eval.max,
                                   iter.max = control$iter.max,
                                   trace = control$trace ) )
+  }
+
+  #
+  get_hessian = function(obj, par){
+    if( (length(obj$env$random)==0) & (sum(obj$env$profile)==0) ){
+      H = obj$he(x=par)
+    }else{
+      H = optimHess(par, fn=obj$fn, gr=obj$gr)
+    }
+    return(H)
   }
 
   # Newtonsteps
   for( i in seq_len(max(0,control$newton_loops)) ){
     if( isFALSE(control$quiet) ) message("Running newton_loop #", i)
     g = as.numeric( obj$gr(opt$par) )
-    h = optimHess(opt$par, fn=obj$fn, gr=obj$gr)
+    #h = optimHess(opt$par, fn=obj$fn, gr=obj$gr)
+    h = get_hessian(obj=obj, par=opt$par)
     opt$par = opt$par - solve(h, g)
     opt$objective = obj$fn(opt$par)
   }
   rep = obj$report()
   parhat = obj$env$parList()
 
+  # Sanity checks
+  if( any(rep$B_ti==0) ){
+    warning("Some `B_ti=0` which typically occurs in multistanza models when W<Wmat for one or more years")
+  }
+
   # sdreport
+  derived = list()
   if( isTRUE(control$getsd) ){
-    hessian.fixed = optimHess( par = opt$par, 
-                      fn = obj$fn, 
-                      gr = obj$gr )
+    #hessian.fixed = optimHess( par = opt$par, 
+    #                  fn = obj$fn, 
+    #                  gr = obj$gr )
+    hessian.fixed = get_hessian(obj=obj, par=opt$par)
     sdrep = sdreport( obj,
                       par.fixed = opt$par,
                       hessian.fixed = hessian.fixed,
                       getJointPrecision = control$getJointPrecision )
+    if( length(control$derived_quantities) > 0 ){
+      # Relist
+      tmp_list = as.list(sdrep, report=TRUE, what="Estimate")[["do.call(\"c\", derived_values)"]]
+      derived$Est = relist( flesh=tmp_list, skeleton=obj$report()$derived_values )
+      tmp_list = as.list(sdrep, report=TRUE, what="Std. Error")[["do.call(\"c\", derived_values)"]]
+      derived$SE = relist( flesh=tmp_list, skeleton=obj$report()$derived_values )
+    }
   }else{
     hessian.fixed = sdrep = NULL
   }
@@ -334,12 +486,21 @@ function( taxa,
   environment()
   on.exit( gc() )  # Seems necessary after environment()
   
-  # bundle and return output
+  # bundle and return output (all necessary inputs for compute_nll)
   internal = list(
+    call = match.call(),
     parhat = parhat,
     control = control,
+    settings = settings,
+    log_prior = log_prior,
     Bobs_ti = Bobs_ti,
     Cobs_ti = Cobs_ti,
+    Nobs_ta_g2 = Nobs_ta_g2,
+    Wobs_ta_g2 = Wobs_ta_g2,
+    n_species = n_species,
+    noB_i = noB_i,
+    biomass = biomass,
+    catch = catch,
     # Avoid stuff that's in parhat
     #logPB_i = logPB_i, 
     #logQB_i = logQB_i, 
@@ -356,6 +517,7 @@ function( taxa,
     opt = opt,
     rep = rep,
     sdrep = sdrep,
+    derived = derived,
     tmb_inputs = list(p=p, map=map),
     call = match.call(),
     run_time = Sys.time() - start_time,
@@ -405,6 +567,7 @@ function( taxa,
 #' @param F_type whether to integrate catches along with biomass (\code{"integrated"})
 #'        or calculate catches from the Baranov catch equation applied to average 
 #'        biomass (\code{"averaged"})
+#' @param derived_quantities character-vector listing objects to ADREPORT
 #' @param tmbad.sparse_hessian_compress passed to [TMB::config()], and enabling 
 #'        an experimental feature to save memory when first computing the inner
 #'        Hessian matrix.  Using \code{tmbad.sparse_hessian_compress=1} seems
@@ -425,8 +588,8 @@ function( nlminb_loops = 1,
           silent = getOption("ecostate.silent", TRUE),
           trace = getOption("ecostate.trace", 0),
           verbose = getOption("ecostate.verbose", FALSE),
-          profile = c("logF_ti"),
-          random = c("epsilon_ti","alpha_ti"),
+          profile = c("logF_ti","log_winf_z","s50_z","srate_z"),
+          random = c("epsilon_ti","alpha_ti","nu_ti","phi_tg2"),
           tmb_par = NULL,
           map = NULL,
           getJointPrecision = FALSE,
@@ -434,9 +597,11 @@ function( nlminb_loops = 1,
           process_error = c("epsilon", "alpha"),
           n_steps = 10,
           F_type = c("integrated", "averaged"),
+          derived_quantities = c("h_g2","B_ti","B0_i"),
           scale_solver = c("joint", "simple"),
           inverse_method = c("Standard", "Penrose_moore"),
           tmbad.sparse_hessian_compress = 1,
+          use_gradient = TRUE,
           start_tau = 0.001 ){
 
   #
@@ -464,10 +629,12 @@ function( nlminb_loops = 1,
     integration_method = integration_method,
     n_steps = n_steps,
     F_type = F_type,
+    derived_quantities = derived_quantities,
     scale_solver = scale_solver,
     inverse_method = inverse_method,
     process_error = process_error,
     tmbad.sparse_hessian_compress = tmbad.sparse_hessian_compress,
+    use_gradient = use_gradient,
     start_tau = start_tau
   ), class = "ecostate_control" )
 }
@@ -490,9 +657,9 @@ function( x,
   # Params
   out1 = data.frame( 
     "type" = x$internal$type_i,
-    "QB" = exp(x$internal$parhat[['logQB_i']]),
-    "PB" = exp(x$internal$parhat[['logPB_i']]),
     # Use out_initial so it includes add_equilibrium values
+    "QB" = x$rep$out_initial$QB_i,
+    "PB" = x$rep$out_initial$PB_i,
     "B" = x$rep$out_initial$B_i,      
     "EE" = x$rep$out_initial$EE_i,
     "U" = x$internal$parhat[["U_i"]]
@@ -518,6 +685,34 @@ function( x,
                  "diet_matrix" = out2, 
                  "vulnerability_matrix" = out3 )
   return(invisible(Return))
+}
+
+#' @title Marginal log-likelihood
+#'
+#' @description Extract the (marginal) log-likelihood of a ecostate model
+#'
+#' @param object Output from \code{\link{ecostate}}
+#' @param ... Not used
+#'
+#' @return object of class \code{logLik} with attributes
+#'   \item{val}{log-likelihood}
+#'   \item{df}{number of parameters}
+#' @importFrom stats logLik
+#'
+#' @return
+#' Returns an object of class logLik. This has attributes
+#' "df" (degrees of freedom) giving the number of (estimated) fixed effects
+#' in the model, abd "val" (value) giving the marginal log-likelihood.
+#' This class then allows \code{AIC} to work as expected.
+#'
+#' @export
+logLik.ecostate <- function(object, ...) {
+  val = -1 * object$opt$objective
+  df = length( object$opt$par )
+  out = structure( val,
+             df = df,
+             class = "logLik")
+  return(out)
 }
 
 #' @title Print fitted ecostate object

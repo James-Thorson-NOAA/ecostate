@@ -1,7 +1,7 @@
 Package: ecostate
 Type: Package
 Title: State-Space Extension of EcoPath with EcoSim
-Version: 0.1.1
+Version: 0.2.0
 Date: 2024-11-15
 Authors@R: c(
     person(c("James", "T."), "Thorson", , "James.Thorson@noaa.gov", 
@@ -18,8 +18,8 @@ Description: Fits a state-space extension of Ecopath with Ecosim (EwE)
 License: GPL-3
 Depends:
     R (>= 4.1.0),
-Imports:
     RTMB (>= 1.5.0),
+Imports:
     TMB,
     MASS,
     checkmate,
@@ -36,9 +36,12 @@ Enhances:
 Remotes:
     DTUAqua/spict/spict,
     jabbamodel/JABBA,
-    NOAA-EDAB/Rpath
+    NOAA-EDAB/Rpath,
+    kaskr/RTMB/RTMBode
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 LazyData: true
+BuildVignettes: yes
 URL: https://james-thorson-noaa.github.io/EcoState/
 BugReports: https://github.com/James-Thorson-NOAA/EcoState/issues
+VignetteBuilder: knitr

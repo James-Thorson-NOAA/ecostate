@@ -28,7 +28,8 @@
 dBdt <-
 function( Time, 
           State, 
-          Pars, 
+          Pars,
+          F_type = "integrated",
           what = "dBdt" ){     
 
   # Inputs from function call
@@ -46,7 +47,7 @@ function( Time,
   
   # passed via environment:  type_i
   
-  # Indicators 
+  # Indicators
   which_primary = which( type_i=="auto" )
   which_detritus = which( type_i=="detritus" )
   
@@ -56,22 +57,27 @@ function( Time,
   Ypred_ij = rep(1,n_species) %*% t(Ypred_j)
   Yprey_i = Bt_i / B_i
   Yprey_ij = Yprey_i %*% t(rep(1,n_species))
-  U_ij = rep(1,n_species) %*% t(U_i)
+  nu_ij = rep(1,n_species) %*% t(nu_i)
   # Consumption = Equilibrium * Pred_functional_response * Prey_functional_response
-  Q_ij = Qe_ij * ( X_ij * Ypred_ij / ( X_ij - 1 + Ypred_ij ) ) * Yprey_ij
+  #Qe_ij = adsparse_to_matrix(Qe_ij)
+  Q_ij = Qe_ij * ( X_ij * Ypred_ij / ( X_ij - 1 + Ypred_ij ) ) * Yprey_ij * exp(nu_ij)
+  #Q_ij = elementwise_product( Qe_ij, ( X_ij * Ypred_ij / ( X_ij - 1 + Ypred_ij ) ) * Yprey_ij )
 
   # Calculate growth G_i (called C_i originally but conflicts with catch C_ti)
   G_i = GE_i * colSums(Q_ij)
+  #G_i = GE_i * (t(rep(1,n_species)) %*% Q_ij)[1,]
   # Replace production for consumption for primary producers, including self-limitation via X_ij
   numerator = X_ij[cbind(which_primary,which_primary)] * Yprey_i[which_primary]
   denominator = ( X_ij[cbind(which_primary,which_primary)] - 1 + Yprey_i[which_primary] )
   G_i[which_primary] = PB_i[which_primary] * B_i[which_primary] * numerator / denominator
   # Replace for detritus
-  G_i[which_detritus] = sum(Q_ij * U_ij) + sum(m0_i * Bt_i)
+  #G_i[which_detritus] = sum(Q_ij * U_ij) + sum(m0_i * Bt_i)
+  G_i[which_detritus] = sum(Q_ij %*% matrix(U_i)) + sum(m0_i * Bt_i)
   
   # Mortalities
   M0_i = m0_i * Bt_i
   M2_i = rowSums(Q_ij)
+  #M2_i = (Q_ij %*% rep(1,n_species))[,1]
   m2_i = M2_i / Bt_i
   
   # Total mortality
@@ -99,10 +105,11 @@ function( Time,
     g_i = G_i / Bt_i
 
     # Predation mortality .. removed because it doesn't vary over time
-    #M2_i = (DC_ij %*% (B_i*QB_i))[,1] / B_i
     # Bundle and return
     Return = list( B_i = B_i, 
-                   EE_i = EE_i, 
+                   EE_i = EE_i,
+                   PB_i = PB_i, 
+                   QB_i = QB_i, # For filled in stanza values 
                    GE_i = GE_i, 
                    m0_i = m0_i, 
                    M0_i = M0_i, 
