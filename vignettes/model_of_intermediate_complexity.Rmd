@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 #  devtools::install_github( 'James-Thorson-NOAA/ecostate', force=TRUE )
 # Build
 # setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)'); 
-# devtools::build_rmd("vignettes/web_only/model_of_intermediate_complexity.Rmd"); rmarkdown::render( "vignettes/web_only/model_of_intermediate_complexity.Rmd", rmarkdown::pdf_document())
+# devtools::build_rmd("vignettes/model_of_intermediate_complexity.Rmd"); rmarkdown::render( "vignettes/model_of_intermediate_complexity.Rmd", rmarkdown::pdf_document())
 ```
 
 ```{r setup, echo=TRUE, message=FALSE}

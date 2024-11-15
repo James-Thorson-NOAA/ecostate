@@ -144,7 +144,6 @@ run = function( map, nlminb_loops, getsd ){
                                 n_steps = 30,
                                 profile = NULL,
                                 random = NULL,
-                                sdreport_detail = 0,
                                 map = map,
                                 start_tau = 0.1 ),
     settings = stanza_settings(

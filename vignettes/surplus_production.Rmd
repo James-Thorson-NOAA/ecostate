@@ -248,8 +248,8 @@ And we can also plot the estimated and true biomass
 
 ```{r, echo=TRUE, message=TRUE, fig.width=7, fig.height=7}
 # Extract estimated biomass
-Bhat_t = as.list(out$sdrep, what="Estimate", report=TRUE )$B_ti
-Bse_t = as.list(out$sdrep, what="Std. Error", report=TRUE )$B_ti
+Bhat_t = out$derived$Est$B_ti
+Bse_t = out$derived$SE$B_ti
 
 # Reformat to long-form data frame for ggplot
 results = cbind( "Year" = years,
@@ -399,9 +399,10 @@ out_stanzas
 #
 meanage_t = meanweight_t = rep(NA, length(years))
 for(t in seq_along(years)){
-  meanage_t[t] = weighted.mean( x=1:30, w=out_stanzas$rep$Y_tzz[t,,'NageS'] )
-  meanweight_t[t] = weighted.mean( x=out_stanzas$rep$Y_tzz[t,,'WageS'], 
-                                   w=out_stanzas$rep$Y_tzz[t,,'NageS'] )
+  meanage_t[t] = weighted.mean( x = 1:30,
+                                w = exp(out_stanzas$rep$Y_tzz_g2[[1]][t,,'log_NageS']) )
+  meanweight_t[t] = weighted.mean( x = out_stanzas$rep$Y_tzz_g2[[1]][t,,'WageS'],
+                                   w = exp(out_stanzas$rep$Y_tzz_g2[[1]][t,,'log_NageS']) )
 }
 par( mfrow=c(2,1), mar=c(3,4,2,1) )
 plot( x=years, y=meanage_t, lwd=2, type="l", main="Mean age" )
