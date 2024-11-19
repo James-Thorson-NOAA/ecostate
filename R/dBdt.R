@@ -8,6 +8,11 @@
 #' @param State todo
 #' @param Pars todo
 #' @param what todo
+#' @param F_type whether to integrate catches along with biomass (\code{"integrated"})
+#'        or calculate catches from the Baranov catch equation applied to average
+#'        biomass (\code{"averaged"})
+#' @param n_species number of species
+#' @param type_i type for each taxon
 #'
 #' @details
 #' todo
@@ -29,24 +34,30 @@ dBdt <-
 function( Time, 
           State, 
           Pars,
+          type_i,
+          n_species,
           F_type = "integrated",
           what = "dBdt" ){     
 
   # Inputs from function call
-  RTMB::getAll(Pars)
+  #RTMB::getAll(Pars)
   Bt_i = State[1:n_species]
 
   # Inputs from local environment
-  QB_i = exp(logQB_i)
-  PB_i = exp(logPB_i)
-  X_ij = exp(Xprime_ij) + 1
-  B_i = exp(logB_i)
-  # EE_i is in Pars
-  # U_i is in Pars
-  F_i = exp(logF_i)
-  
-  # passed via environment:  type_i
-  
+  QB_i = exp(Pars$logQB_i)
+  PB_i = exp(Pars$logPB_i)
+  X_ij = exp(Pars$Xprime_ij) + 1
+  B_i = exp(Pars$logB_i)
+  U_i = Pars$U_i
+  EE_i = Pars$EE_i
+  F_i = exp(Pars$logF_i)
+  m0_i = Pars$m0_i
+  Qe_ij = Pars$Qe_ij
+  GE_i = Pars$GE_i
+  detritus_turnover = Pars$detritus_turnover
+  epsilon_i = Pars$epsilon_i
+  nu_i = Pars$nu_i
+
   # Indicators
   which_primary = which( type_i=="auto" )
   which_detritus = which( type_i=="detritus" )

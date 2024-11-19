@@ -10,7 +10,12 @@
 #' @inheritParams compute_tracer
 #'
 #' @param Q_ij Consumption of each prey i by predator j in units biomass.
-#' @param inverse_method whether to use pseudoinverse or standard inverse
+#' @param xtracer_i tracer to use when computing x-axis values
+#' @param ytracer_i tracer to use when computing y-axis values
+#' @param B_i biomass to use when weighting taxa in plot
+#' @param taxa_labels character vector of labels to use for each taxon
+#' @param xloc x-axis location (overrides calculation using \code{xtracer_i})
+#' @param yloc y-axis location (overrides calculation using \code{ytracer_i})
 #'
 #' @details
 #' Trophic level \eqn{l_i} for each predator \eqn{i} is defined as:
@@ -78,10 +83,12 @@ function( Q_ij,
   g$log_mass = rep(NA, nrow(g))
   g$log_mass[which(is.na(g$log_flow))] = log(B_i / min(B_i,na.rm=TRUE))
   
-  p = ggplot2::ggplot(g) + 
-    ggnetwork::geom_edges( ggplot2::aes(x=x, y=y, xend=xend, yend=yend, colour=log_flow) ) +
-    ggnetwork::geom_nodes( ggplot2::aes(x=x, y=y, size=log_mass ) ) + 
-    ggnetwork::geom_nodetext( ggplot2::aes(x=x, y=y, label=name), fontface="bold", col="red")
+  # https://stackoverflow.com/questions/9439256/how-can-i-handle-r-cmd-check-no-visible-binding-for-global-variable-notes-when
+  x = y = xend = yend = name = log_flow = log_mass = NULL
+  p = ggplot2::ggplot(g, ggplot2::aes(x=x, y=y, xend=xend, yend=yend) ) +
+    ggnetwork::geom_edges( ggplot2::aes(colour=log_flow) ) +  #
+    ggnetwork::geom_nodes( ggplot2::aes(size=log_mass ) ) +  #
+    ggnetwork::geom_nodetext( ggplot2::aes(label=name), fontface="bold", col="red")  #
   print(p)
   return(invisible(p))
 }

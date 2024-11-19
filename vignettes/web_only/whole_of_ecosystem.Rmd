@@ -14,16 +14,17 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+start_time = Sys.time()
 # Install locally
 #  devtools::install_local( R'(C:\Users\James.Thorson\Desktop\Git\ecostate)', force=TRUE )
 #  devtools::install_github( 'James-Thorson-NOAA/ecostate', force=TRUE )
 # Build
-# setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)'); 
-# devtools::build_rmd("vignettes/whole_of_ecosystem.Rmd"); rmarkdown::render( "vignettes/whole_of_ecosystem.Rmd", rmarkdown::pdf_document())
+# setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)');
+# devtools::build_rmd("vignettes/web_only/whole_of_ecosystem.Rmd"); rmarkdown::render( "vignettes/web_only/whole_of_ecosystem.Rmd", rmarkdown::pdf_document())
 ```
 
 ```{r setup, echo=TRUE, message=FALSE}
-library(EcoState)
+library(ecostate)
 ```
 
 `ecostate` is an R package for fitting the mass-balance dynamics specified by EcoSim as a state-space model.   We here demonstrate how it can be fitted to an entire ecosystem, using inputs from a previous Rpath model from Whitehouse et al. 2021, and fitting it to biomass and catch time-series for pollock, cod, and arrowtooth.
@@ -182,3 +183,8 @@ df = data.frame( taxa,
                  "Difference" = Bhat - Borig )
 knitr::kable( df, digits=3 )
 ```
+
+```{r, include = FALSE, warning=FALSE, message=FALSE}
+run_time = Sys.time() - start_time
+```
+Runtime for this vignette: `r paste( round(unclass(run_time),2), attr(run_time, "units") )`

@@ -11,7 +11,17 @@
 #' @param biomass long-form data frame with columns \code{Mass}, \code{Year}
 #'        and  \code{Taxon}, where \code{Mass} is assumed to have the same units
 #'        as \code{catch}
-#' @param PB numeric-vector with names matching \code{taxa}, providing the                        
+#' @param agecomp a named list, with names corresponding to \code{stanza_groups},
+#'        where each list-element is a matrix with rownames for \code{years}
+#'        and colnames for integer ages, where NA excludes the entry from inclusion
+#'        and the model computes the likelihood across included ages in a given year,
+#'        and the rowsum is the input-sample size for a given year
+#' @param weight a named list, with names corresponding to \code{stanza_groups},
+#'        where each list-element is a matrix with rownames for \code{years}
+#'        and colnames for integer ages, where NA excludes the entry from inclusion
+#'        and the model computes the lognormal likelihood for weight-at-age
+#'        in each specified age-year combination
+#' @param PB numeric-vector with names matching \code{taxa}, providing the
 #'        ratio of production to biomass for each taxon
 #' @param QB numeric-vector with names matching \code{taxa}, providing the          
 #'        ratio of consumption to biomass for each taxon
@@ -20,6 +30,9 @@
 #' @param U numeric-vector with names matching \code{taxa}, providing the 
 #'        proportion of consumption that is unassimilated and therefore
 #'        exported to detritus
+#' @param EE numeric-vector with names matching \code{taxa}, providing the
+#'        proportion of proportion of production that is subsequently
+#'        modeled (termed ecotrophic efficiency)
 #' @param type character-vector with names matching \code{taxa} and
 #'        elements \code{c("auto","hetero","detritus")},
 #'        indicating whether each taxon is a primary producer, consumer/predator, or
@@ -37,12 +50,16 @@
 #'        to equilibrium biomass is estimated as a fixed effect
 #' @param fit_eps Character-vector listing \code{taxa} for which the
 #'        model should estimate annual process errors in dB/dt
+#' @param fit_nu Character-vector listing \code{taxa} for which the
+#'        model should estimate annual process errors in consumption \code{Q_ij}
 #' @param fit_PB Character-vector listing \code{taxa} for which equilibrium
 #'        production per biomass is estimated.  Note that it is likely
 #'        a good idea to include a prior for any species for which this is estimated.
 #' @param fit_QB Character-vector listing \code{taxa} for which equilibrium
 #'        consumption per biomass is estimated.  Note that it is likely
 #'        a good idea to include a prior for any species for which this is estimated.
+#' @param fit_EE Character-vector listing \code{taxa} for which ecotrophic
+#'        efficiency is estimated.
 #' @param log_prior A user-provided function that takes as input the list of
 #'        parameters \code{out$obj$env$parList()} where \code{out} is the output from
 #'        \code{ecostate()}, and returns a numeric vector
@@ -52,16 +69,53 @@
 #'        for the first \code{taxa} with logmean of zero and logsd of 0.1
 #' @param control Output from [ecostate_control()], used to define user
 #'        settings.
+#' @param settings Output from [stanza_settings()], used to define age-structured
+#'        dynamics (called stanza-groups).
 #'
 #' @importFrom TMB config
 #' @importFrom checkmate assertDouble assertFactor assertCharacter assertList
-#' @importFrom Matrix Matrix Diagonal sparseMatrix
+#' @importFrom stats dnorm nlminb optimHess weighted.mean
+#' @importFrom igraph graph_from_adjacency_matrix
+#' @importFrom ggplot2 ggplot aes
+#' @importFrom ggnetwork ggnetwork geom_edges geom_nodes geom_nodetext
+#' @importFrom utils relist
 #'
 #' @details
 #' All \code{taxa} must be included in \code{QB}, \code{PB}, \code{B}, and \code{DC},
 #' but additional taxa can be in \code{QB}, \code{PB}, \code{B}, and \code{DC} that
 #' are not in \code{taxa}.  So \code{taxa} can be used to redefine the set of modeled
 #' species without changing other inputs
+#'
+#' @return
+#' An object (list) of S3-class `ecostate`. Elements include:
+#' \describe{
+#' \item{obj}{RTMB object from \code{\link[RTMB]{MakeADFun}}}
+#' \item{tmb_inputs}{The list of inputs passed to \code{\link[RTMB]{MakeADFun}}}
+#' \item{opt}{The output from \code{\link[stats]{nlminb}}}
+#' \item{sdrep}{The output from \code{\link[RTMB]{sdreport}}}
+#' \item{interal}{Objects useful for package function, i.e., all arguments
+#'                passed during the call}
+#' \item{rep}{report file, including matrix \code{B_ti} for biomass in each year
+#'         \code{t} and taxon \code{i}, \code{g_ti} for growth rate per biomass,
+#'         \code{m_ti} for mortality rate per biomass, \code{Q_tij} for total
+#'         consumption for each prey \code{i} by each predator \code{j}, and
+#'         other model quantities}
+#' \item{derived}{derived quantity estimates and standard errors, for \code{rep}
+#'         objects as requested}
+#' \item{call}{function call record}
+#' \item{run_time}{Total runtime}
+#' }
+#' This S3 class then has functions \code{summary}, \code{print}, and
+#' \code{logLik}
+#'
+#' @references
+#'
+#' **Introducing the state-space mass-balance model:**
+#'
+#' Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G.,
+#' McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A (In press).
+#' The benefits of hierarchical ecosystem models: demonstration
+#' using a new state-space mass-balance model EcoState. Fish and Fisheries.
 #'
 #' @export
 ecostate <-
@@ -87,10 +141,11 @@ function( taxa,
           fit_QB = vector(),
           fit_eps = vector(),
           fit_nu = vector(),
-          fit_phi = vector(),
           log_prior = function(p) 0,
           settings = stanza_settings(taxa=taxa),
           control = ecostate_control() ){
+  # importFrom RTMB MakeADFun REPORT ADREPORT sdreport getAll
+  # importFrom Matrix Matrix Diagonal sparseMatrix
 
   # Necessary in packages
   "c" <- ADoverload("c")
@@ -262,8 +317,8 @@ function( taxa,
   map$logsigma_i = factor(ifelse(taxa %in% fit_nu, seq_len(n_species), NA))
 
   #
-  p$logpsi_g2 = ifelse(settings$unique_stanza_groups %in% fit_phi, log(control$start_tau), NA)
-  map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% fit_phi, seq_len(settings$n_g2), NA))
+  p$logpsi_g2 = ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA)
+  map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, seq_len(settings$n_g2), NA))
 
   # Catches
   map$logF_ti = factor( ifelse(is.na(Cobs_ti), NA, seq_len(prod(dim(Cobs_ti)))) )
@@ -347,51 +402,51 @@ function( taxa,
   }
 
   # Load data in environment for function "compute_nll"
-  data = local({
-                  Bobs_ti = Bobs_ti
-                  Cobs_ti = Cobs_ti
-                  Nobs_ta_g2 = Nobs_ta_g2
-                  Wobs_ta_g2 = Wobs_ta_g2
-                  years = years
-                  #DC_ij = DC_ij
-                  control = control
-                  #n_steps = control$n_steps
-                  if( control$integration_method == "ABM"){
-                    project_vars = abm3pc_sys 
-                  }else if( control$integration_method =="RK4"){
-                    project_vars = rk4sys 
-                  }else{
-                    project_vars = function(f, a, b, y0, n, Pars){
-                      myode( f, a, b, y0, n, Pars, method=control$integration_method )
-                    }
-                  }
-                  #F_type = control$F_type
-                  n_species = n_species
-                  noB_i = noB_i
-                  #scale_solver = control$scale_solver
-                  #inverse_method = control$inverse_method
-                  type_i = type_i
-                  #process_error = control$process_error
-                  #sdreport_detail = control$sdreport_detail
-                  settings = settings
-                  stanza_data = stanza_data
-                  taxa = taxa
-                  fit_eps = fit_eps
-                  fit_nu = fit_nu
-                  log_prior = log_prior
-                  environment()
-  })
-  environment(compute_nll) <- data
+  #data = local({
+  #                Bobs_ti = Bobs_ti
+  #                Cobs_ti = Cobs_ti
+  #                Nobs_ta_g2 = Nobs_ta_g2
+  #                Wobs_ta_g2 = Wobs_ta_g2
+  #                years = years
+  #                #DC_ij = DC_ij
+  #                control = control
+  #                #n_steps = control$n_steps
+  #                if( control$integration_method == "ABM"){
+  #                  project_vars = abm3pc_sys
+  #                }else if( control$integration_method =="RK4"){
+  #                  project_vars = rk4sys
+  #                }else{
+  #                  project_vars = function(f, a, b, y0, n, Pars){
+  #                    myode( f, a, b, y0, n, Pars, method=control$integration_method )
+  #                  }
+  #                }
+  #                #F_type = control$F_type
+  #                n_species = n_species
+  #                noB_i = noB_i
+  #                #scale_solver = control$scale_solver
+  #                #inverse_method = control$inverse_method
+  #                type_i = type_i
+  #                #process_error = control$process_error
+  #                #sdreport_detail = control$sdreport_detail
+  #                settings = settings
+  #                stanza_data = stanza_data
+  #                taxa = taxa
+  #                fit_eps = fit_eps
+  #                fit_nu = fit_nu
+  #                log_prior = log_prior
+  #                environment()
+  #})
+  #environment(compute_nll) <- data
 
   # Load data in environment for function "dBdt"
-  data2 = local({
-                  type_i = type_i
-                  n_species = n_species
-                  F_type = control$F_type
-                  environment()
-  })
-  environment(dBdt) <- data2
-  environment(project_stanzas) <- data2    # project_stanzas(.) calls dBdt(.)
+  #data2 = local({
+  #                type_i = type_i
+  #                n_species = n_species
+  #                F_type = control$F_type
+  #                environment()
+  #})
+  #environment(dBdt) <- data2
+  #environment(project_stanzas) <- data2    # project_stanzas(.) calls dBdt(.)
 
   # 
   #data3 = local({
@@ -408,16 +463,53 @@ function( taxa,
   })
   environment(log_prior) <- data4
 
-  # Make TMB object
-  #browser()
-  # compute_nll(p)
-  # environment(compute_nll) <- data
-  obj <- MakeADFun( func = compute_nll, 
+  # SEE ?RTMB::MakeADFun examples
+  if( control$integration_method == "ABM"){
+    project_vars = abm3pc_sys
+  }else if( control$integration_method =="RK4"){
+    project_vars = rk4sys
+  }#else{
+    #project_vars = function(f, a, b, y0, n, Pars){
+    #  myode( f, a, b, y0, n, Pars, method=control$integration_method )
+    #}
+  #}
+  #cmb <- function(f, d) function(p) f(p, d) ## Helper to make closure
+  cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
+  #
+  obj <- MakeADFun( func = cmb( compute_nll,
+                                Bobs_ti = Bobs_ti,
+                                Cobs_ti = Cobs_ti,
+                                Nobs_ta_g2 = Nobs_ta_g2,
+                                Wobs_ta_g2 = Wobs_ta_g2,
+                                noB_i = noB_i,
+                                type_i = type_i,
+                                n_species = n_species,
+                                years = years,
+                                taxa = taxa,
+                                project_vars = project_vars,
+                                control = control,
+                                fit_eps = fit_eps,
+                                fit_nu = fit_nu,
+                                settings = settings,
+                                log_prior = log_prior,
+                                stanza_data = stanza_data,
+                                DC_ij = DC_ij ),
                     parameters = p,
                     map = map,
                     random = control$random,
                     profile = control$profile,
                     silent = control$silent )
+
+  # Make TMB object
+  #browser()
+  # compute_nll(p)
+  # environment(compute_nll) <- data
+  #obj <- MakeADFun( func = compute_nll,
+  #                  parameters = p,
+  #                  map = map,
+  #                  random = control$random,
+  #                  profile = control$profile,
+  #                  silent = control$silent )
   #traceback(max=20)
   #obj$fn(obj$par)
 
@@ -551,8 +643,8 @@ function( taxa,
 #' @param getJointPrecision whether to get the joint precision matrix.  Passed
 #'        to \code{\link[TMB]{sdreport}}.
 #' @param integration_method What numerical integration method to use. \code{"ABM"}
-#'        uses a native-R versions of Adam-Bashford, code{"RK4"} uses a native-R
-#'        version of Runge-Kutta-4, and code{"ode23"} uses a native-R
+#'        uses a native-R versions of Adam-Bashford, \code{"RK4"} uses a native-R
+#'        version of Runge-Kutta-4, and \code{"ode23"} uses a native-R
 #'        version of adaptive Runge-Kutta-23, 
 #'        where all are adapted from \code{pracma} functions.
 #'        \code{"rk4"} and \code{lsoda} use those methods
@@ -564,6 +656,8 @@ function( taxa,
 #'        \code{process_error="alpha"}The
 #'        former is more interpretable, whereas the latter is much more computationally
 #'        efficient.  
+#' @param scale_solver Whether to solve for ecotrophic efficiency EE given biomass B
+#'        (\code{scale_solver="simple"}) or solve for a combination of EE and B values
 #' @param F_type whether to integrate catches along with biomass (\code{"integrated"})
 #'        or calculate catches from the Baranov catch equation applied to average 
 #'        biomass (\code{"averaged"})
@@ -577,6 +671,12 @@ function( taxa,
 #'        to hugely speed up the model-fitting with a large model but results in a small
 #'        decrease in speed for model-fitting with a small model. 
 #' @param start_tau Starting value for the standard deviation of process errors
+#' @param profile parameters that are profiled across,
+#'        passed to \code{\link[RTMB]{MakeADFun}}
+#' @param random parameters that are treated as random effects,
+#'        passed to \code{\link[RTMB]{MakeADFun}}
+#' @param n_steps number of steps used in the ODE solver for biomass dynamics
+#' @param inverse_method whether to use pseudoinverse or standard inverse
 #'
 #' @export
 ecostate_control <-
@@ -601,7 +701,7 @@ function( nlminb_loops = 1,
           scale_solver = c("joint", "simple"),
           inverse_method = c("Standard", "Penrose_moore"),
           tmbad.sparse_hessian_compress = 1,
-          use_gradient = TRUE,
+          #use_gradient = TRUE,
           start_tau = 0.001 ){
 
   #
@@ -634,7 +734,7 @@ function( nlminb_loops = 1,
     inverse_method = inverse_method,
     process_error = process_error,
     tmbad.sparse_hessian_compress = tmbad.sparse_hessian_compress,
-    use_gradient = use_gradient,
+    use_gradient = TRUE,
     start_tau = start_tau
   ), class = "ecostate_control" )
 }

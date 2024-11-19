@@ -16,6 +16,9 @@ compute_tracer(
 
 \item{inverse_method}{whether to use pseudoinverse or standard inverse}
 
+\item{type_i}{character vector indicating whether a taxon is "hetero", "auto", or
+"detritus"}
+
 \item{tracer_i}{an indicator matrix specifying the traver value}
 }
 \description{

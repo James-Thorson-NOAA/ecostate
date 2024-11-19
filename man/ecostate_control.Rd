@@ -26,7 +26,6 @@ ecostate_control(
   scale_solver = c("joint", "simple"),
   inverse_method = c("Standard", "Penrose_moore"),
   tmbad.sparse_hessian_compress = 1,
-  use_gradient = TRUE,
   start_tau = 0.001
 )
 }
@@ -52,6 +51,12 @@ for the outer optimizer. Passed to
 
 \item{verbose}{Output additional messages about model steps during fitting?}
 
+\item{profile}{parameters that are profiled across,
+passed to \code{\link[RTMB]{MakeADFun}}}
+
+\item{random}{parameters that are treated as random effects,
+passed to \code{\link[RTMB]{MakeADFun}}}
+
 \item{tmb_par}{list of parameters for starting values, with shape identical
 to \code{tinyVAST(...)$internal$parlist}}
 
@@ -61,8 +66,8 @@ to \code{tinyVAST(...)$internal$parlist}}
 to \code{\link[TMB]{sdreport}}.}
 
 \item{integration_method}{What numerical integration method to use. \code{"ABM"}
-uses a native-R versions of Adam-Bashford, code{"RK4"} uses a native-R
-version of Runge-Kutta-4, and code{"ode23"} uses a native-R
+uses a native-R versions of Adam-Bashford, \code{"RK4"} uses a native-R
+version of Runge-Kutta-4, and \code{"ode23"} uses a native-R
 version of adaptive Runge-Kutta-23,
 where all are adapted from \code{pracma} functions.
 \code{"rk4"} and \code{lsoda} use those methods
@@ -76,11 +81,18 @@ and predicted biomass (i.e., a "state-space" parameterization),
 former is more interpretable, whereas the latter is much more computationally
 efficient.}
 
+\item{n_steps}{number of steps used in the ODE solver for biomass dynamics}
+
 \item{F_type}{whether to integrate catches along with biomass (\code{"integrated"})
 or calculate catches from the Baranov catch equation applied to average
 biomass (\code{"averaged"})}
 
 \item{derived_quantities}{character-vector listing objects to ADREPORT}
+
+\item{scale_solver}{Whether to solve for ecotrophic efficiency EE given biomass B
+(\code{scale_solver="simple"}) or solve for a combination of EE and B values}
+
+\item{inverse_method}{whether to use pseudoinverse or standard inverse}
 
 \item{tmbad.sparse_hessian_compress}{passed to \code{\link[TMB:config]{TMB::config()}}, and enabling
 an experimental feature to save memory when first computing the inner

@@ -25,14 +25,14 @@ Imports:
     checkmate,
     ggplot2,
     ggnetwork,
-    intergraph
+    igraph
 Suggests:
-    RTMBode,
     knitr
 Enhances:
     spict,
     JABBA,
-    Rpath
+    Rpath,
+    boot
 Remotes:
     DTUAqua/spict/spict,
     jabbamodel/JABBA,
@@ -40,8 +40,7 @@ Remotes:
     kaskr/RTMB/RTMBode
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-LazyData: true
-BuildVignettes: yes
-URL: https://james-thorson-noaa.github.io/EcoState/
-BugReports: https://github.com/James-Thorson-NOAA/EcoState/issues
 VignetteBuilder: knitr
+LazyData: true
+URL: https://james-thorson-noaa.github.io/ecostate/
+BugReports: https://github.com/James-Thorson-NOAA/ecostate/issues

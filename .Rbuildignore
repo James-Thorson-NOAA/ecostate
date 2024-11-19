@@ -5,3 +5,4 @@
 ^pkgdown$
 ^scratch$
 ^codecov\.yml$
+^vignettes/web_only$

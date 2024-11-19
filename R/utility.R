@@ -4,9 +4,10 @@
 #' @description Calculate how a tracer propagates through consumption.
 #'
 #' @inheritParams ecostate
+#' @inheritParams compute_nll
+#' @inheritParams ecostate_control
 #'
 #' @param Q_ij Consumption of each prey i by predator j in units biomass.
-#' @param inverse_method whether to use pseudoinverse or standard inverse
 #' @param tracer_i an indicator matrix specifying the traver value
 #'
 #' @details
@@ -66,9 +67,9 @@ function( Q_ij,
 
 #' @title Penrose-Moore pseudoinverse
 #' @description Extend \code{MASS:ginv} to work with RTMB
-#' @param X Matrix used to compute pseudoinverse
+#' @param x Matrix used to compute pseudoinverse
 #' @importFrom MASS ginv
-ginv <- RTMB::ADjoint(function(X) {
+ginv <- RTMB::ADjoint(function(x) {
     n <- sqrt(length(X))
     dim(X) <- c(n,n)
     MASS::ginv(X)
@@ -78,37 +79,12 @@ ginv <- RTMB::ADjoint(function(X) {
     -t(Y)%*%dY%*%t(Y)
 }, name="ginv")
 
-#' @title Elementwise product of sparse and dense matrices
-#' @description Calculate elementwise product of sparse and dense matrices
-#' @param Msparse sparse matrix
-#' @param Mdense dense matrix
-#' @export
-elementwise_product = function(Msparse, Mdense){
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
-  if(!("p" %in% names(attributes(Msparse)))) browser()
-  if(length(Msparse@x)>0){
-    Mout = Msparse
-    j = rep( seq_len(nrow(Msparse)), times=diff(Msparse@p) )
-    Mout@x = Msparse@x + Mdense[cbind(Msparse@i+1, j)]
-  }else{
-    Mout = Matrix::sparseMatrix(i=1, j=1, x=0)
-  }
-  return(Mout)
-}
-
-#' @export
-adsparse_to_matrix = function(x){
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
-  y = matrix(0, nrow=nrow(x), ncol=ncol(x))
-  j = rep( seq_len(nrow(x)), times=diff(x@p) )
-  y[cbind(x@i+1, j)] = x@x
-  y
-}
-
 #' @title Dirichlet-multinomial
 #' @description Allows data-weighting as parameter
+#' @param x numeric vector of observations across categories
+#' @param prob numeric vector of category probabilities
+#' @param ln_theta logit-ratio of effective and input sample size
+#' @param log whether to return the log-probability or not
 #' @examples
 #' library(RTMB)
 #' prob = rep(0.1,10)

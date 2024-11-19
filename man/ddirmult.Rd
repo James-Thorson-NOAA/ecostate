@@ -6,6 +6,15 @@
 \usage{
 ddirmult(x, prob, ln_theta, log = TRUE)
 }
+\arguments{
+\item{x}{numeric vector of observations across categories}
+
+\item{prob}{numeric vector of category probabilities}
+
+\item{ln_theta}{logit-ratio of effective and input sample size}
+
+\item{log}{whether to return the log-probability or not}
+}
 \description{
 Allows data-weighting as parameter
 }

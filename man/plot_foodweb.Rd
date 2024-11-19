@@ -18,7 +18,20 @@ plot_foodweb(
 \arguments{
 \item{Q_ij}{Consumption of each prey i by predator j in units biomass.}
 
-\item{inverse_method}{whether to use pseudoinverse or standard inverse}
+\item{type_i}{character vector indicating whether a taxon is "hetero", "auto", or
+"detritus"}
+
+\item{xtracer_i}{tracer to use when computing x-axis values}
+
+\item{ytracer_i}{tracer to use when computing y-axis values}
+
+\item{B_i}{biomass to use when weighting taxa in plot}
+
+\item{taxa_labels}{character vector of labels to use for each taxon}
+
+\item{xloc}{x-axis location (overrides calculation using \code{xtracer_i})}
+
+\item{yloc}{y-axis location (overrides calculation using \code{ytracer_i})}
 }
 \description{
 Plot consumption as a directed graph including all taxa (vertices)

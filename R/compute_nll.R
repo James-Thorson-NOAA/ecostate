@@ -4,18 +4,55 @@
 #' @description                                               
 #' Compute negative log-likelihood for EcoState model
 #'
+#' @inheritParams add_equilibrium
+#' @inheritParams dBdt
+#' @inheritParams ecostate
+#'
 #' @param p list of parameters
+#' @param control output from \link{ecostate_control}
+#' @param project_vars function to integrate differential equation
+#' @param DC_ij Diet projections matrix
+#' @param Bobs_ti formatted matrix of biomass data
+#' @param Cobs_ti formatted matrix of catch data
+#' @param Nobs_ta_g2 formatted list of age-comp data
+#' @param Wobs_ta_g2 formatted list of weight-at-age data
+#' @param stanza_data output from \code{make_stanza_data}
+#'
 #'
 #' @details
 #' todo
 #'
 #' @export
 compute_nll <-
-function( p ) { 
+function( p,
+          taxa,
+          years,
+          noB_i,
+          type_i,
+          n_species,
+          project_vars,
+          DC_ij,
+          Bobs_ti,
+          Cobs_ti,
+          Nobs_ta_g2,
+          Wobs_ta_g2,
+          log_prior,
+          fit_eps,
+          fit_nu,
+          stanza_data,
+          settings,
+          control ) {
+
   
   # Necessary in packages
   "c" <- ADoverload("c")
   "[<-" <- ADoverload("[<-")
+
+  n_steps = control$n_steps
+  F_type = control$F_type
+  scale_solver = control$scale_solver
+  inverse_method = control$inverse_method
+  process_error = control$process_error
 
   # Compute stanza stuff
   p = add_stanza_params( p,
@@ -47,6 +84,9 @@ function( p ) {
   out_initial = dBdt( Time = 1,
               State = c( exp(p$logB_i), rep(0,n_species)),
               Pars = p_t,
+              type_i = type_i,
+              n_species = n_species,
+              F_type = F_type,
               what = "stuff" )
   
   # Objects to save
@@ -123,6 +163,9 @@ function( p ) {
           b = 1,
           n = control$n_steps,
           Pars = p_t,
+          type_i = type_i,
+          n_species = n_species,
+          F_type = F_type,
           y0 = y0 )
     Bnew_i = proj$y[nrow(proj$y),seq_len(n_species)]
 
@@ -133,8 +176,11 @@ function( p ) {
                    stanza_data = stanza_data,
                    y = proj$y,
                    STEPS_PER_YEAR = settings$STEPS_PER_YEAR,
-                   record_steps = FALSE,
-                   correct_errors = settings$correct_errors ) # Have used TRUE
+                   type_i = type_i,
+                   n_species = n_species,
+                   F_type = F_type,
+                   #correct_errors = settings$correct_errors,
+                   record_steps = FALSE ) # Have used TRUE
       #Y_zz = proj_stanzas$Y_zz
       #Y_tzz[t,,] = Y_zz
       Y_zz_g2 = proj_stanzas$Y_zz_g2
@@ -187,6 +233,9 @@ function( p ) {
     out_mean = dBdt( Time = 0,
                 State = c(Bmean_ti[t,], rep(0,n_species)),
                 Pars = p_t,
+                type_i = type_i,
+                n_species = n_species,
+                F_type = F_type,
                 what = "stuff" )
 
     # Must calculate during loop because G_ti is NA for t=1
@@ -332,7 +381,7 @@ function( p ) {
 
   for( g2 in seq_len(settings$n_g2) ){
   for( t in seq_len(nrow(Bexp_ti)) ){
-    if( (settings$unique_stanza_groups %in% fit_phi)[g2] ){
+    if( (settings$unique_stanza_groups %in% settings$fit_phi)[g2] ){
       loglik7_tg2[t,g2] = dnorm( p$phi_tg2[t,g2], 0, exp(p$logpsi_g2[g2]), log=TRUE)
     }
   }}
@@ -398,7 +447,7 @@ function( p ) {
 
   # Allow for ADREPORT
   Wmat_g2 = p$Wmat_g2
-  X_ij = 1 + exp(Xprime_ij)
+  X_ij = 1 + exp(p$Xprime_ij)
   REPORT( Wmat_g2 )
   REPORT( X_ij )
 

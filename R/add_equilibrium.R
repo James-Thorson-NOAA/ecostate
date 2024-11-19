@@ -8,6 +8,9 @@
 #' Compute equilibrium values
 #'
 #' @param ecoparams list of parameters
+#' @param noB_i Boolean vector indicating which taxa have no B value
+#' @param type_i character vector indicating whether a taxon is "hetero", "auto", or
+#'        "detritus"
 #'
 #' @details
 #' todo

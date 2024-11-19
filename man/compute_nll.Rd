@@ -4,10 +4,73 @@
 \alias{compute_nll}
 \title{Compute negative log-likelihood for EcoState model}
 \usage{
-compute_nll(p)
+compute_nll(
+  p,
+  taxa,
+  years,
+  noB_i,
+  type_i,
+  n_species,
+  project_vars,
+  DC_ij,
+  Bobs_ti,
+  Cobs_ti,
+  Nobs_ta_g2,
+  Wobs_ta_g2,
+  log_prior,
+  fit_eps,
+  fit_nu,
+  stanza_data,
+  settings,
+  control
+)
 }
 \arguments{
 \item{p}{list of parameters}
+
+\item{taxa}{Character vector of taxa included in model.}
+
+\item{years}{Integer-vector of years included in model}
+
+\item{noB_i}{Boolean vector indicating which taxa have no B value}
+
+\item{type_i}{character vector indicating whether a taxon is "hetero", "auto", or
+"detritus"}
+
+\item{n_species}{number of species}
+
+\item{project_vars}{function to integrate differential equation}
+
+\item{DC_ij}{Diet projections matrix}
+
+\item{Bobs_ti}{formatted matrix of biomass data}
+
+\item{Cobs_ti}{formatted matrix of catch data}
+
+\item{Nobs_ta_g2}{formatted list of age-comp data}
+
+\item{Wobs_ta_g2}{formatted list of weight-at-age data}
+
+\item{log_prior}{A user-provided function that takes as input the list of
+parameters \code{out$obj$env$parList()} where \code{out} is the output from
+\code{ecostate()}, and returns a numeric vector
+where the sum is the log-prior probability.  For example
+\code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
+specifies a lognormal prior probability for the catchability coefficient
+for the first \code{taxa} with logmean of zero and logsd of 0.1}
+
+\item{fit_eps}{Character-vector listing \code{taxa} for which the
+model should estimate annual process errors in dB/dt}
+
+\item{fit_nu}{Character-vector listing \code{taxa} for which the
+model should estimate annual process errors in consumption \code{Q_ij}}
+
+\item{stanza_data}{output from \code{make_stanza_data}}
+
+\item{settings}{Output from \code{\link[=stanza_settings]{stanza_settings()}}, used to define age-structured
+dynamics (called stanza-groups).}
+
+\item{control}{output from \link{ecostate_control}}
 }
 \description{
 Compute negative log-likelihood for EcoState model

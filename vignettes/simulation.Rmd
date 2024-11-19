@@ -14,15 +14,17 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+start_time = Sys.time()
 # Install locally
 #  devtools::install_local( R'(C:\Users\James.Thorson\Desktop\Git\ecostate)', force=TRUE )
 #  devtools::install_github( 'James-Thorson-NOAA/ecostate', force=TRUE )
 # Build
-#  setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)'); devtools::build_rmd("vignettes/simulation.Rmd"); rmarkdown::render( "vignettes/simulation.Rmd", rmarkdown::pdf_document())
+#  setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)')
+#  devtools::build_rmd("vignettes/web_only/simulation.Rmd"); rmarkdown::render( "vignettes/web_only/simulation.Rmd", rmarkdown::pdf_document())
 ```
 
 ```{r setup, echo=TRUE, message=FALSE}
-library(EcoState)
+library(ecostate)
 ```
 
 `ecostate` is an R package for fitting the mass-balance dynamics specified by EcoSim as a state-space model.   We here highlight a few features in particular.
@@ -86,10 +88,10 @@ simulate_data = function(){
                      type_i = type_i,
                      noB_i = ifelse( is.na(B_i), 1, 0),
                      epsilon_i = rep(0,n_species),
-                     logF_i = rep(-Inf,n_species),
-                     which_primary = which_primary,
-                     #F_type = "integrated",
-                     which_detritus = which_detritus )
+                     logF_i = rep(-Inf,n_species) )
+                     #which_detritus = which_detritus,
+                     #which_primary = which_primary,
+                     #F_type = "integrated" )
   Pars_full = add_equilibrium( Pars,
                                scale_solver = "joint",
                                noB_i = ifelse(is.na(Pars$logB_i),1,0),
@@ -112,17 +114,20 @@ simulate_data = function(){
     pars_t$nu_i = rep(0,n_species)
 
     # Integrate dynamics annually
-    data2 = local({
-                    n_species = n_species
-                    environment()
-    })
-    environment(dBdt) <- data2
+    #data2 = local({
+    #                n_species = n_species
+    #                environment()
+    #})
+    #environment(dBdt) <- data2
     sim = project_vars(
           f = dBdt,
           a = years[t-1], 
           b = years[t],
           n = n_steps,
           Pars = pars_t,
+          type_i = type_i,
+          n_species = n_species,
+          F_type = "integrated",
           y0 = c( B_ti[t-1,], rep(0,n_species) ) )
     
     # Record results
@@ -272,6 +277,12 @@ fittedEE_i = rep(NA, n_species)
 names(PB_i) = names(QB_i) = names(fittedB_i) = names(fittedEE_i) = names(type_i) = names(U_i) = taxa
   dimnames(DC_ij) = dimnames(X_ij) = list("Prey"=taxa, "Predator"=taxa)
   
+# Define priors
+log_prior = function(p){
+  # Prior on process-error log-SD to stabilize model
+  logp = sum(dnorm( p$logtau_i, mean=log(0.2), sd=1, log=TRUE ), na.rm=TRUE)
+}
+
 # Run model
 out = ecostate( taxa = taxa,
                 years = years,
@@ -289,15 +300,13 @@ out = ecostate( taxa = taxa,
                 fit_Q = fit_Q,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
-                control = ecostate_control( inverse_method = "Standard", 
-                                            trace = 1,
-                                            nlminb_loops = 1,
-                                            tmbad.sparse_hessian_compress = 0,  # Much faster to turn off
-                                            getsd = TRUE,
-                                            process_error = "epsilon",  # alpha is faster than epsilon
+                log_prior = log_prior,
+                control = ecostate_control( # Much faster to turn off
+                                            tmbad.sparse_hessian_compress = 0,
+                                            # Faster to profile these
                                             profile = c("logF_ti","logB_i"),
-                                            derived_quantities = c("B_ti"),
-                                            start_tau = 0.001 ))   
+                                            # More stable when starting low
+                                            start_tau = 0.001 ))
 
 # print output to terminal
 out
@@ -331,6 +340,14 @@ ggplot(results) +
 We can also explore estimating additional parameters.  Here, we explore estimating vulnerability:
 
 ```{r, echo=TRUE, message=TRUE, fig.width=7, fig.height=7}
+# Define priors
+log_prior = function(p){
+  # Prior on process-error log-SD to stabilize model
+  logp = sum(dnorm( p$logtau_i, mean=log(0.2), sd=1, log=TRUE ), na.rm=TRUE)
+  # Prior on vulnerability to stabilize model (single value mirrored below)
+  logp = logp + dnorm( p$Xprime_ij[1,1], mean=0, sd=1, log=TRUE )
+}
+
 # Run model
 out0 = ecostate( taxa = taxa,
                 years = years,
@@ -348,17 +365,18 @@ out0 = ecostate( taxa = taxa,
                 fit_Q = fit_Q,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
-                control = ecostate_control( inverse_method = "Standard", 
+                log_prior = log_prior,
+                control = ecostate_control( inverse_method = "Standard",
                                             nlminb_loops = 0,
-                                            tmbad.sparse_hessian_compress = 0,  
+                                            tmbad.sparse_hessian_compress = 0,
                                             getsd = FALSE,
                                             process_error = "epsilon",
                                             profile = c("logF_ti","logB_i"),
-                                            start_tau = 0.001 ))   # alpha is faster than epsilon
+                                            start_tau = 0.1 ))
 
 # Change tmb_par
 tmb_par = out0$tmb_inputs$p
-  tmb_par$Xprime_ij[,which(type_i!="auto")] = log(1.5 - 1) 
+  tmb_par$Xprime_ij[,which(type_i!="auto")] = log(1.5 - 1)
 map = out0$tmb_inputs$map
   map$Xprime_ij = array(NA, dim=dim(tmb_par$Xprime_ij))
   map$Xprime_ij[,which(type_i!="auto")] = 1
@@ -381,9 +399,10 @@ out = ecostate( taxa = taxa,
                 fit_Q = fit_Q,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
-                control = ecostate_control( inverse_method = "Standard", 
+                log_prior = log_prior,
+                control = ecostate_control( inverse_method = "Standard",
                                             nlminb_loops = 1,
-                                            tmbad.sparse_hessian_compress = 0,  
+                                            tmbad.sparse_hessian_compress = 0,
                                             getsd = TRUE,
                                             process_error = "epsilon",
                                             profile = c("logF_ti","logB_i"),
@@ -394,3 +413,8 @@ out = ecostate( taxa = taxa,
 # print output to terminal
 out
 ```
+
+```{r, include = FALSE, warning=FALSE, message=FALSE}
+run_time = Sys.time() - start_time
+```
+Runtime for this vignette: `r paste( round(unclass(run_time),2), attr(run_time, "units") )`

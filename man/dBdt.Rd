@@ -4,7 +4,15 @@
 \alias{dBdt}
 \title{Dynamics from EcoSim}
 \usage{
-dBdt(Time, State, Pars, F_type = "integrated", what = "dBdt")
+dBdt(
+  Time,
+  State,
+  Pars,
+  type_i,
+  n_species,
+  F_type = "integrated",
+  what = "dBdt"
+)
 }
 \arguments{
 \item{Time}{todo}
@@ -12,6 +20,14 @@ dBdt(Time, State, Pars, F_type = "integrated", what = "dBdt")
 \item{State}{todo}
 
 \item{Pars}{todo}
+
+\item{type_i}{type for each taxon}
+
+\item{n_species}{number of species}
+
+\item{F_type}{whether to integrate catches along with biomass (\code{"integrated"})
+or calculate catches from the Baranov catch equation applied to average
+biomass (\code{"averaged"})}
 
 \item{what}{todo}
 }

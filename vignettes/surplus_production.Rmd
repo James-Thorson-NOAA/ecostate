@@ -14,15 +14,17 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+start_time = Sys.time()
 # Install locally
 #  devtools::install_local( R'(C:\Users\James.Thorson\Desktop\Git\ecostate)', force=TRUE, dep=FALSE )
 #  devtools::install_github( 'James-Thorson-NOAA/ecostate', force=TRUE )
 # Build
-#  setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)'); devtools::build_rmd("vignettes/surplus_production.Rmd"); rmarkdown::render( "vignettes/surplus_production.Rmd", rmarkdown::pdf_document())
+#  setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)')
+#  devtools::build_rmd("vignettes/web_only/surplus_production.Rmd"); rmarkdown::render( "vignettes/web_only/surplus_production.Rmd", rmarkdown::pdf_document())
 ```
 
 ```{r setup, echo=TRUE, message=FALSE}
-library(EcoState)
+library(ecostate)
 set.seed(101)
 ```
 
@@ -107,6 +109,7 @@ fit_eps = taxa   # process errors
 fit_Q = taxa       # catchability coefficient
 fit_B0 = c()      # non-equilibrium initial condition
 fit_B = taxa       # equilibrium biomass
+fit_PB = taxa     # Productivity _propto_ natural mortality
 
 # Treat it as an autotroph (given there's no prey to consume)
 type = "auto"
@@ -115,6 +118,16 @@ type = "auto"
 names(PB_i) = names(QB_i) = names(B_i) = names(EE_i) = names(type) = names(U_i) = taxa
   dimnames(DC_ij) = dimnames(X_ij) = list("Prey"=taxa, "Predator"=taxa)
   
+# Define priors
+log_prior = function(p){
+  # Prior on productivity
+  logp = dnorm( p$logPB_i, mean=log(0.1), sd=0.5, log=TRUE )
+  # Prior on process-error log-SD to stabilize model
+  logp = logp + dnorm( p$logtau_i, mean=log(0.2), sd=1, log=TRUE )
+  # Prior on vulnerability to stabilize model
+  logp = logp + dnorm( p$Xprime_ij[1,1], mean=0, sd=1, log=TRUE )
+}
+
 # Run model
 out0 = ecostate( taxa = taxa,
                 years = years,
@@ -132,8 +145,11 @@ out0 = ecostate( taxa = taxa,
                 fit_Q = fit_Q,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
+                fit_PB = fit_PB,
+                log_prior = log_prior,
                 control = ecostate_control( nlminb_loops = 0,
-                                            getsd = FALSE ) )
+                                            getsd = FALSE,
+                                            start_tau = 0.1 ) )
 
 # Estimate logPB
 pars = out0$tmb_inputs$p
@@ -157,6 +173,8 @@ out = ecostate( taxa = taxa,
                 fit_Q = fit_Q,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
+                fit_PB = fit_PB,
+                log_prior = log_prior,
                 control = ecostate_control( map = map,
                                             tmb_par = pars ) )
 
@@ -182,13 +200,6 @@ prod_fun = function( biomass, Xprime, logPB, taxon, ecofit ){
   p$epsilon_i = rep(0, n_taxa)
   p$nu_i = rep(0, n_taxa)
   p$phi_g2 = rep(0, ecofit$internal$settings$n_g2)
-  data2 = local({
-                  type_i = type_i
-                  n_species = n_taxa
-                  F_type = ecofit$internal$control$F_type
-                  environment()
-  })
-  environment(dBdt) <- data2
   State = c( ecofit$rep$out_initial$B_i, rep(0,n_taxa) )
   State[match(taxon,ecofit$internal$taxa)] = biomass
   #dBdt(Time=0, State=State, Pars=p)
@@ -198,6 +209,9 @@ prod_fun = function( biomass, Xprime, logPB, taxon, ecofit ){
         b = 1,
         n = ecofit$internal$control$n_steps,
         Pars = p,
+        type_i = type_i,
+        n_species = n_taxa,
+        F_type = "integrated",
         y0 = State )
   biomass1 = rev( proj$y[,match(taxon,ecofit$internal$taxa)] )[1]
   return( biomass1 - biomass )
@@ -294,6 +308,12 @@ fit_B = "target"       # equilibrium biomass
 names(PB_i) = names(QB_i) = names(B_i) = names(EE_i) = names(type) = names(U_i) = taxa
   dimnames(DC_ij) = dimnames(X_ij) = list("Prey"=taxa, "Predator"=taxa)
   
+# Define priors
+log_prior = function(p){
+  # Prior on process-error log-SD to stabilize model
+  logp = dnorm( p$logtau_i, mean=log(0.2), sd=1, log=TRUE )
+}
+
 # Run model
 out_bivar = ecostate( taxa = taxa,
                 years = years,
@@ -311,6 +331,7 @@ out_bivar = ecostate( taxa = taxa,
                 fit_Q = fit_Q,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
+                log_prior = log_prior,
                 control = ecostate_control() )
 
 # print output to terminal
@@ -366,6 +387,12 @@ fit_B = "target"       # equilibrium biomass
 names(PB_i) = names(QB_i) = names(B_i) = names(EE_i) = names(type) = names(U_i) = taxa
   dimnames(DC_ij) = dimnames(X_ij) = list("Prey"=taxa, "Predator"=taxa)
   
+# Define priors
+log_prior = function(p){
+  # Prior on process-error log-SD to stabilize model
+  logp = dnorm( p$logtau_i, mean=log(0.2), sd=1, log=TRUE )
+}
+
 # Run model
 out_stanzas = ecostate( taxa = taxa,
                 years = years,
@@ -384,6 +411,7 @@ out_stanzas = ecostate( taxa = taxa,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
                 control = ecostate_control(),
+                log_prior = log_prior,
                 settings = stanza_settings( taxa = taxa,
                                             stanza_groups = c("target"="age_structured"),
                                             K = c("age_structured" = 0.1),
@@ -438,6 +466,12 @@ fit_B = "stage2"       # equilibrium biomass
 names(PB_i) = names(QB_i) = names(B_i) = names(EE_i) = names(type) = names(U_i) = taxa
   dimnames(DC_ij) = dimnames(X_ij) = list("Prey"=taxa, "Predator"=taxa)
 
+# Define priors
+log_prior = function(p){
+  # Prior on process-error log-SD to stabilize model
+  logp = sum(dnorm( p$logtau_i[2:3], mean=log(0.2), sd=1, log=TRUE))
+}
+
 # Run model
 out_trivar = ecostate( 
   taxa = taxa,
@@ -456,6 +490,7 @@ out_trivar = ecostate(
   fit_Q = fit_Q,
   fit_eps = fit_eps,
   fit_B0 = fit_B0,
+  log_prior = log_prior,
   control = ecostate_control(),
   settings = stanza_settings( 
     taxa = taxa,
@@ -529,3 +564,8 @@ knitr::kable(rbind(
   "JABBA" = c(bet1$pars[c('q','K'),'Median'],bet1$estimates['MSY','mu'])
 ), digits=3)
 ```
+
+```{r, include = FALSE, warning=FALSE, message=FALSE}
+run_time = Sys.time() - start_time
+```
+Runtime for this vignette: `r paste( round(unclass(run_time),2), attr(run_time, "units") )`

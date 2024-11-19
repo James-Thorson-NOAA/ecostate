@@ -1,5 +1,4 @@
 
-#' @export
 make_stanza_data <-
 function( settings ){
 
@@ -83,7 +82,6 @@ function( settings ){
   return( stanza_data )
 }
 
-#' @export
 fecundity_by_weight <-
 function( W,
           Wmat,
@@ -108,7 +106,6 @@ function( W,
   return(out)
 }
 
-#' @export
 add_stanza_params <-
 function( p,
           stanza_data,
@@ -251,7 +248,6 @@ function( p,
   return(p)
 }
 
-#' @export
 update_stanzas <-
 function( p,
           stanza_data,
@@ -385,7 +381,6 @@ function( p,
   return(out)
 }
 
-#' @export
 get_stanza_total <-
 function( stanza_data,
           Y_zz_g2,
@@ -417,14 +412,15 @@ function( stanza_data,
   return(Y_s2)
 }
 
-#' @export
 project_stanzas <-
 function( p,
           stanza_data,
           y,
           #xset,
           #increase_age = TRUE,
-          correct_errors = FALSE,
+          type_i,
+          n_species,
+          F_type,
           record_steps = FALSE,
           STEPS_PER_YEAR ){
 
@@ -448,6 +444,9 @@ function( p,
     dBdt_step = dBdt( Time = 0,
               State = y[xset[STEP],],
               #State = out$B_g2
+              type_i = type_i,
+              n_species = n_species,
+              F_type = F_type,
               Pars = p,
               what = "all")
     FoodGain = colSums(dBdt_step$Q_ij)
@@ -470,19 +469,19 @@ function( p,
     #}
   }
 
-  if(correct_errors){
-    # Calculate ending biomass
-    B_s2 = get_stanza_total( stanza_data = stanza_data,
-                               #Y_zz = Y_zz )
-                               Y_zz_g2 = Y_zz_g2 )
-    # Loop through multi-stanza groups
-    for( g2 in seq_len(stanza_data$n_g2) ){
-      stanzainfo_t2z = stanza_data$stanzainfo_s2z[which(stanza_data$stanzainfo_s2z[,'g2']==g2),,drop=FALSE]
-      error_t2 = B_s2[stanzainfo_t2z[,'s2']] / y[nrow(y),stanzainfo_t2z[,'s']]
-      #Y_zz_g2[[g2]][,'NageS'] = Y_zz_g2[[g2]][,'NageS'] / error_t2[stanza_data$X_zz_g2[[g2]][,'t2']]
-      Y_zz_g2[[g2]][,'log_NageS'] = Y_zz_g2[[g2]][,'log_NageS'] - log(error_t2[stanza_data$X_zz_g2[[g2]][,'t2']])
-    }
-  }
+  #if(correct_errors){
+  #  # Calculate ending biomass
+  #  B_s2 = get_stanza_total( stanza_data = stanza_data,
+  #                             #Y_zz = Y_zz )
+  #                             Y_zz_g2 = Y_zz_g2 )
+  #  # Loop through multi-stanza groups
+  #  for( g2 in seq_len(stanza_data$n_g2) ){
+  #    stanzainfo_t2z = stanza_data$stanzainfo_s2z[which(stanza_data$stanzainfo_s2z[,'g2']==g2),,drop=FALSE]
+  #    error_t2 = B_s2[stanzainfo_t2z[,'s2']] / y[nrow(y),stanzainfo_t2z[,'s']]
+  #    #Y_zz_g2[[g2]][,'NageS'] = Y_zz_g2[[g2]][,'NageS'] / error_t2[stanza_data$X_zz_g2[[g2]][,'t2']]
+  #    Y_zz_g2[[g2]][,'log_NageS'] = Y_zz_g2[[g2]][,'log_NageS'] - log(error_t2[stanza_data$X_zz_g2[[g2]][,'t2']])
+  #  }
+  #}
 
   # Calculate ending biomass
   B_s2 = get_stanza_total( stanza_data = stanza_data,
@@ -503,6 +502,41 @@ function( p,
 #'
 #' @description Define a list of control parameters.
 #'
+#' @inheritParams ecostate
+#'
+#' @param stanza_groups character-vector with names corresponding to \code{taxa}
+#'        and elements specifying the multi-stanza group (i.e., age-structured
+#'        population) for a given taxa
+#' @param K numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+#'        von Bertalanffy growth coefficient for length
+#' @param d numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+#'        von Bertalanffy allometric consumption-at-weight (default is 2/3)
+#' @param Wmat numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+#'        weight-at-maturity relative to asymptotic weight
+#' @param Amax numeric-vector with names matching \code{names(stanza_groups)},
+#'        providing the maximum age  (in units years) for a given taxon
+#'        (and the oldest taxon for a given stanza_group is treated as a plus-group)
+#' @param SpawnX numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+#'        larval vulnerability (density dependence) parameter
+#' @param Leading Boolean vector with names matching \code{names(stanza_groups)},
+#'        with \code{TRUE} for the taxon for which scale (B or EE) is specified
+#'        or estimated, where this is then calculated determinstically
+#'        for other taxa for a given stanza_group
+#' @param fit_K Character-vector listing \code{stanza_groups} for which
+#'        K is estimated
+#' @param fit_d Character-vector listing \code{stanza_groups} for which
+#'        d is estimated (note that this currently does not work)
+#' @param fit_phi Character-vector listing \code{stanza_groups} for which the
+#'        model should estimate annual recruitment deviations, representing
+#'        nonconsumptive variation in larval survival (e.g., oceanographic advection)
+#' @param Amat numeric-vector with names matching \code{unique(stanza_groups)},
+#'        providing the integer age-at-maturity (in units years)
+#' @param Wmatslope numeric-vector with names matching \code{unique(stanza_groups)},
+#'        providing the slope at 0.5 maturity for a logistic maturity-at-weight
+#'        ogive
+#' @param STEPS_PER_YEAR integer number of Euler steps per year for calculating
+#'        integrating individual weight-at-age
+#' @param comp_weight method used for weighting age-composition data
 #'
 #' @export
 stanza_settings <-
@@ -516,12 +550,13 @@ function( taxa,
           Leading,
           fit_K = c(),
           fit_d = c(),
+          fit_phi = vector(),
           Amat = NULL,
           Wmatslope,
           STEPS_PER_YEAR = 1,
-          comp_weight = c("multinom","dir","dirmult"),
-          correct_errors = FALSE,
-          min_agecomp_prob = 0 ){
+          #min_agecomp_prob = 0
+          #correct_errors = FALSE,
+          comp_weight = c("multinom","dir","dirmult") ){
 
   # Necessary in packages
   "c" <- ADoverload("c")
@@ -566,13 +601,14 @@ function( taxa,
     Amax = Amax,
     fit_K = fit_K,
     fit_d = fit_d,
+    fit_phi = fit_phi,
     Leading = Leading,
     SpawnX = SpawnX,
     STEPS_PER_YEAR = STEPS_PER_YEAR,
     comp_weight = comp_weight,
     n_g2 = length(unique_stanza_groups),
-    correct_errors = correct_errors,
-    min_agecomp_prob = min_agecomp_prob
+    #correct_errors = correct_errors,
+    min_agecomp_prob = 0
   ), class = "stanza_settings" )
 }
 

@@ -14,6 +14,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+start_time = Sys.time()
 # Install locally
 #  devtools::install_local( R'(C:\Users\James.Thorson\Desktop\Git\ecostate)', force=TRUE )
 #  devtools::install_github( 'James-Thorson-NOAA/ecostate', force=TRUE )
@@ -23,7 +24,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup, echo=TRUE, message=FALSE}
-library(EcoState)
+library(ecostate)
 ```
 
 `ecostate` is an R package for fitting the mass-balance dynamics specified by EcoSim as a state-space model.   We here demonstrate how it can be fitted to a real-world data set as a "Model of Intermediate Complexity" while including 10 functional groups and 1 detritus pool, using data across four trophic levels and representing both pelagic and demersal energy pathways.
@@ -75,6 +76,12 @@ taxa_to_include = c( "NFS", "Pollock", "Copepod", "Chloro", "Krill" )
 # To run full model use:
 # taxa_to_include = taxa
 
+# Define priors
+log_prior = function(p){
+  # Prior on process-error log-SD to stabilize model
+  logp = sum(dnorm( p$logtau_i, mean=log(0.2), sd=1, log=TRUE ), na.rm=TRUE)
+}
+
 # Run model
 out = ecostate( taxa = taxa_to_include,
                 years = years,
@@ -92,6 +99,7 @@ out = ecostate( taxa = taxa_to_include,
                 fit_Q = fit_Q,
                 fit_eps = fit_eps,
                 fit_B0 = fit_B0,
+                log_prior = log_prior,
                 control = ecostate_control( n_steps = 20, # using 15 by default
                                             start_tau = 0.01,
                                             tmbad.sparse_hessian_compress = 0 ))
@@ -110,3 +118,7 @@ plot_foodweb( out$rep$out_initial$Qe_ij,
               type_i = type_i[taxa_to_include] )
 ```
 
+```{r, include = FALSE, warning=FALSE, message=FALSE}
+run_time = Sys.time() - start_time
+```
+Runtime for this vignette: `r paste( round(unclass(run_time),2), attr(run_time, "units") )`

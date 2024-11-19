@@ -15,13 +15,62 @@ stanza_settings(
   Leading,
   fit_K = c(),
   fit_d = c(),
+  fit_phi = vector(),
   Amat = NULL,
   Wmatslope,
   STEPS_PER_YEAR = 1,
-  comp_weight = c("multinom", "dir", "dirmult"),
-  correct_errors = FALSE,
-  min_agecomp_prob = 0
+  comp_weight = c("multinom", "dir", "dirmult")
 )
+}
+\arguments{
+\item{taxa}{Character vector of taxa included in model.}
+
+\item{stanza_groups}{character-vector with names corresponding to \code{taxa}
+and elements specifying the multi-stanza group (i.e., age-structured
+population) for a given taxa}
+
+\item{K}{numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+von Bertalanffy growth coefficient for length}
+
+\item{d}{numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+von Bertalanffy allometric consumption-at-weight (default is 2/3)}
+
+\item{Wmat}{numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+weight-at-maturity relative to asymptotic weight}
+
+\item{Amax}{numeric-vector with names matching \code{names(stanza_groups)},
+providing the maximum age  (in units years) for a given taxon
+(and the oldest taxon for a given stanza_group is treated as a plus-group)}
+
+\item{SpawnX}{numeric-vector with names matching \code{unique(stanza_groups)}, providing the
+larval vulnerability (density dependence) parameter}
+
+\item{Leading}{Boolean vector with names matching \code{names(stanza_groups)},
+with \code{TRUE} for the taxon for which scale (B or EE) is specified
+or estimated, where this is then calculated determinstically
+for other taxa for a given stanza_group}
+
+\item{fit_K}{Character-vector listing \code{stanza_groups} for which
+K is estimated}
+
+\item{fit_d}{Character-vector listing \code{stanza_groups} for which
+d is estimated (note that this currently does not work)}
+
+\item{fit_phi}{Character-vector listing \code{stanza_groups} for which the
+model should estimate annual recruitment deviations, representing
+nonconsumptive variation in larval survival (e.g., oceanographic advection)}
+
+\item{Amat}{numeric-vector with names matching \code{unique(stanza_groups)},
+providing the integer age-at-maturity (in units years)}
+
+\item{Wmatslope}{numeric-vector with names matching \code{unique(stanza_groups)},
+providing the slope at 0.5 maturity for a logistic maturity-at-weight
+ogive}
+
+\item{STEPS_PER_YEAR}{integer number of Euler steps per year for calculating
+integrating individual weight-at-age}
+
+\item{comp_weight}{method used for weighting age-composition data}
 }
 \description{
 Define a list of control parameters.

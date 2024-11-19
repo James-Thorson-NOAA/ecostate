@@ -4,7 +4,7 @@
 \alias{abm3pc_sys}
 \title{Adams-Bashford-Moulton for system of equations}
 \usage{
-abm3pc_sys(f, a, b, y0, n, Pars)
+abm3pc_sys(f, a, b, y0, n, Pars, ...)
 }
 \arguments{
 \item{f}{function in the differential equation \eqn{y' = f(x, y)};
@@ -16,7 +16,11 @@ defined as a function \eqn{R \times R^m \rightarrow R^m}, where \eqn{m} is the n
 
 \item{y0}{starting values at time \code{a}}
 
+\item{n}{number of steps}
+
 \item{Pars}{named list of parameters passed to f}
+
+\item{...}{additional inputs to function \code{f}}
 }
 \description{
 Third-order Adams-Bashford-Moulton predictor-corrector method.

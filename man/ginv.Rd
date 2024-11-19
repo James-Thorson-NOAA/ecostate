@@ -7,7 +7,7 @@
 ginv(x)
 }
 \arguments{
-\item{X}{Matrix used to compute pseudoinverse}
+\item{x}{Matrix used to compute pseudoinverse}
 }
 \description{
 Extend \code{MASS:ginv} to work with RTMB
