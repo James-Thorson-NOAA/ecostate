@@ -97,9 +97,7 @@
 #'                passed during the call}
 #' \item{rep}{report file, including matrix \code{B_ti} for biomass in each year
 #'         \code{t} and taxon \code{i}, \code{g_ti} for growth rate per biomass,
-#'         \code{m_ti} for mortality rate per biomass, \code{Q_tij} for total
-#'         consumption for each prey \code{i} by each predator \code{j}, and
-#'         other model quantities}
+#'         and see \code{dBdt} for other quantities reported by year}
 #' \item{derived}{derived quantity estimates and standard errors, for \code{rep}
 #'         objects as requested}
 #' \item{call}{function call record}

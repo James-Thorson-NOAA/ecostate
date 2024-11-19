@@ -20,7 +20,12 @@
 #'
 #'
 #' @details
-#' todo
+#' Given a list of parameters, calculates the joint negative log-likelihood,
+#' where the Laplace approximation is then used to marginalize across random
+#' effects to calculate the log-marginal likelihood of fixed effects. The joint
+#' likelihood includes the fit to fishery catches, biomass indices,
+#' age-composition data, weight-at-age data, priors, and the distribution for
+#' random effects.
 #'
 #' @export
 compute_nll <-

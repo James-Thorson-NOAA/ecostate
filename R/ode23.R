@@ -15,7 +15,8 @@
 #' @param atol absolute tolerance.
 #'
 #' @details
-#' Copied from pracma under GPL-3, with small modifications to work with RTMB
+#' Copied from pracma under GPL-3, with small modifications to work with RTMB.
+#' This can be used to simulate dynamics, but not during estimation
 #'
 #' @export
 ode23 <- 

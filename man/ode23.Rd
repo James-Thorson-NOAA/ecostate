@@ -28,5 +28,6 @@ defined as a function \eqn{R \times R^m \rightarrow R^m}, where \eqn{m} is the n
 Runge-Kutta (2, 3)-method with variable step size, resp
 }
 \details{
-Copied from pracma under GPL-3, with small modifications to work with RTMB
+Copied from pracma under GPL-3, with small modifications to work with RTMB.
+This can be used to simulate dynamics, but not during estimation
 }

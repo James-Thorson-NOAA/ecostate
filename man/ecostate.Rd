@@ -125,6 +125,26 @@ dynamics (called stanza-groups).}
 \item{control}{Output from \code{\link[=ecostate_control]{ecostate_control()}}, used to define user
 settings.}
 }
+\value{
+An object (list) of S3-class \code{ecostate}. Elements include:
+\describe{
+\item{obj}{RTMB object from \code{\link[RTMB]{MakeADFun}}}
+\item{tmb_inputs}{The list of inputs passed to \code{\link[RTMB]{MakeADFun}}}
+\item{opt}{The output from \code{\link[stats]{nlminb}}}
+\item{sdrep}{The output from \code{\link[RTMB]{sdreport}}}
+\item{interal}{Objects useful for package function, i.e., all arguments
+passed during the call}
+\item{rep}{report file, including matrix \code{B_ti} for biomass in each year
+\code{t} and taxon \code{i}, \code{g_ti} for growth rate per biomass,
+and see \code{dBdt} for other quantities reported by year}
+\item{derived}{derived quantity estimates and standard errors, for \code{rep}
+objects as requested}
+\item{call}{function call record}
+\item{run_time}{Total runtime}
+}
+This S3 class then has functions \code{summary}, \code{print}, and
+\code{logLik}
+}
 \description{
 Estimate parameters for an EcoState model
 }
@@ -133,4 +153,12 @@ All \code{taxa} must be included in \code{QB}, \code{PB}, \code{B}, and \code{DC
 but additional taxa can be in \code{QB}, \code{PB}, \code{B}, and \code{DC} that
 are not in \code{taxa}.  So \code{taxa} can be used to redefine the set of modeled
 species without changing other inputs
+}
+\references{
+\strong{Introducing the state-space mass-balance model:}
+
+Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G.,
+McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A (In press).
+The benefits of hierarchical ecosystem models: demonstration
+using a new state-space mass-balance model EcoState. Fish and Fisheries.
 }

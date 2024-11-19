@@ -15,11 +15,11 @@ dBdt(
 )
 }
 \arguments{
-\item{Time}{todo}
+\item{Time}{not used}
 
-\item{State}{todo}
+\item{State}{vector of state variables to integrate}
 
-\item{Pars}{todo}
+\item{Pars}{list of parameters governing the ODE}
 
 \item{type_i}{type for each taxon}
 
@@ -29,7 +29,7 @@ dBdt(
 or calculate catches from the Baranov catch equation applied to average
 biomass (\code{"averaged"})}
 
-\item{what}{todo}
+\item{what}{what output to produce}
 }
 \value{
 An object (list) of ranges. Elements include:
@@ -44,8 +44,9 @@ An object (list) of ranges. Elements include:
 }
 }
 \description{
-Compute system of differential equations representing EcoSim dynamics
+Compute system of differential equations representing EcoState dynamics
+derived from EcoSim.
 }
 \details{
-todo
+This function has syntax designed to match \code{pracma} solvers.
 }

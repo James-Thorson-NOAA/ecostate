@@ -21,5 +21,7 @@ add_equilibrium(ecoparams, scale_solver, noB_i, type_i)
 Compute equilibrium values
 }
 \details{
-todo
+Replaces NA values in ecotrophic efficiency and/or biomass with equilibrium
+solution, and then calculates equilibrium consumption, natural mortality,
+and other rates.
 }

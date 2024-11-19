@@ -13,7 +13,9 @@
 #'        "detritus"
 #'
 #' @details
-#' todo
+#' Replaces NA values in ecotrophic efficiency and/or biomass with equilibrium
+#' solution, and then calculates equilibrium consumption, natural mortality,
+#' and other rates.
 #'
 #' @export
 add_equilibrium <-

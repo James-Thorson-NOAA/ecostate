@@ -538,6 +538,9 @@ function( p,
 #'        integrating individual weight-at-age
 #' @param comp_weight method used for weighting age-composition data
 #'
+#' @return
+#'
+#' An object (list) of S3-class `stanza_settings`.
 #' @export
 stanza_settings <-
 function( taxa,

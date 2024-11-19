@@ -26,6 +26,7 @@ defined as a function \eqn{R \times R^m \rightarrow R^m}, where \eqn{m} is the n
 Classical Runge-Kutta of order 4.
 }
 \details{
-Classical Runge-Kutta of order 4 for (systems of) ordinary differential equations with fixed step size.
+Classical Runge-Kutta of order 4 for (systems of) ordinary differential
+equations with fixed step size.
 Copied from pracma under GPL-3, with small modifications to work with RTMB
 }

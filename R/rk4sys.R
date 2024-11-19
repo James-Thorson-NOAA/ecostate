@@ -14,7 +14,8 @@
 #' @param ... additional inputs to function \code{f}
 #'
 #' @details
-#' Classical Runge-Kutta of order 4 for (systems of) ordinary differential equations with fixed step size.
+#' Classical Runge-Kutta of order 4 for (systems of) ordinary differential
+#' equations with fixed step size.
 #' Copied from pracma under GPL-3, with small modifications to work with RTMB
 #'
 #' @export

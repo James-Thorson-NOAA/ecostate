@@ -72,6 +72,9 @@ integrating individual weight-at-age}
 
 \item{comp_weight}{method used for weighting age-composition data}
 }
+\value{
+An object (list) of S3-class \code{stanza_settings}.
+}
 \description{
 Define a list of control parameters.
 }

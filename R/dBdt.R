@@ -2,12 +2,13 @@
 #' Dynamics from EcoSim
 #'
 #' @description 
-#' Compute system of differential equations representing EcoSim dynamics
+#' Compute system of differential equations representing EcoState dynamics
+#' derived from EcoSim.
 #'
-#' @param Time todo
-#' @param State todo
-#' @param Pars todo
-#' @param what todo
+#' @param Time not used
+#' @param State vector of state variables to integrate
+#' @param Pars list of parameters governing the ODE
+#' @param what what output to produce
 #' @param F_type whether to integrate catches along with biomass (\code{"integrated"})
 #'        or calculate catches from the Baranov catch equation applied to average
 #'        biomass (\code{"averaged"})
@@ -15,7 +16,7 @@
 #' @param type_i type for each taxon
 #'
 #' @details
-#' todo
+#' This function has syntax designed to match \code{pracma} solvers.
 #'
 #' @return
 #' An object (list) of ranges. Elements include:

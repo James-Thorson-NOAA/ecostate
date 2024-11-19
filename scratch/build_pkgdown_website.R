@@ -21,7 +21,7 @@ if( FALSE ){
   #knitr::knit( "web_only/eastern_bering_sea.Rmd.orig", output = "web_only/eastern_bering_sea.Rmd" )
 }
 
-setwd(R'(C:\Users\James.Thorson\Desktop\Git\EcoState)')
+setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)')
 
 # Only needed once
 if( FALSE ){
