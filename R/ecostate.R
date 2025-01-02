@@ -191,7 +191,7 @@ function( taxa,
       stop("Please check `colnames(covariates)` to confirm that all variables (columns) have a unique name")
     }
     
-    beta <- setNames(as.numeric(sem$model[,"start"]), sem$model[,"name"])
+    beta <- as.numeric(sem$model[,"start"])
     beta[is.na(beta)] <- 0
     
   }
@@ -297,7 +297,6 @@ function( taxa,
   n_weight = length(Wobs_ta_g2)
 
   # parameter list
-  #browser()
   p = list( delta_i = rep(log(1), n_species),
             ln_sdB = log(0.1), 
             ln_sdC = log(0.1),
@@ -315,7 +314,7 @@ function( taxa,
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
-            beta = rep(0.01, ifelse(use_sem, length(beta), 1)),
+            beta = if (use_sem) beta else 0,
             mu = rep(0, ifelse(is.null(covariates), 1, ncol(covariates))),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
             logq_i = rep( log(1), n_species),
