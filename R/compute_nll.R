@@ -49,6 +49,8 @@ function( p,
           fit_eps,
           fit_nu,
           stanza_data,
+          sem,
+          covariates,
           settings,
           control ) {
 
@@ -102,6 +104,7 @@ function( p,
   TL_ti = dBdt0_ti = M_ti = m_ti = G_ti = g_ti = M2_ti = m2_ti = Bmean_ti = Chat_ti = B_ti = Bhat_ti = matrix( NA, ncol=n_species, nrow=nrow(Bobs_ti) )
   loglik1_ti = loglik2_ti = loglik3_ti = loglik4_ti = matrix( 0, ncol=n_species, nrow=nrow(Bobs_ti) )  # Missing = 0
   loglik5_tg2 = loglik6_tg2 = loglik7_tg2 = matrix( 0, nrow=nrow(Bobs_ti), ncol=length(settings$unique_stanza_groups) )
+  loglik8_sem = 0
   Q_tij = array( NA, dim=c(nrow(Bobs_ti),n_species,n_species) )
   Nexp_ta_g2 = Nobs_ta_g2
   Wexp_ta_g2 = Wobs_ta_g2
@@ -272,25 +275,64 @@ function( p,
   F_ti = exp(p$logF_ti)
   Z_ti = F_ti + M_ti 
   
-  # likelihood
+  # Likelihood (observed biomass and catch)
   Bobs_ti = OBS(Bobs_ti)
   Cobs_ti = OBS(Cobs_ti)
   Bexp_ti = B_ti * (rep(1,nrow(B_ti)) %*% t(exp(p$logq_i)))
   for( i in seq_len(n_species) ){
-  for( t in seq_len(nrow(Bexp_ti)) ){
-    if( !is.na(Bobs_ti[t,i]) ){
-      loglik1_ti[t,i] = dnorm( log(Bobs_ti[t,i]), log(Bexp_ti[t,i]), exp(p$ln_sdB), log=TRUE)
+    for( t in seq_len(nrow(Bexp_ti)) ){
+      if( !is.na(Bobs_ti[t,i]) ){
+        loglik1_ti[t,i] = dnorm( log(Bobs_ti[t,i]), log(Bexp_ti[t,i]), exp(p$ln_sdB), log=TRUE)
+      }
+      if( !is.na(Cobs_ti[t,i]) ){
+        loglik3_ti[t,i] = dnorm( log(Cobs_ti[t,i]), log(Chat_ti[t,i]), exp(p$ln_sdC), log=TRUE)
+      }
+    }}
+  
+  # Likelihood (process errors)
+  if (!is.null(covariates)) {
+    
+    # SEM precision matrix
+    Q <- make_matrices(setNames(p_t$beta, sem$model[,"name"]), sem$model, years, sem$variables)$Q_kk
+    
+    # Observations for SEM likelihood
+    Xit <- matrix(NA, nrow = length(years), ncol = length(sem$variables))
+    colnames(Xit) <- sem$variables
+    Xit[,colnames(covariates)] <- covariates
+    
+    # Subtract covariate means
+    Xit[,colnames(covariates)] <- sweep(Xit[,colnames(covariates), drop = FALSE], 2, p_t$mu)
+    
+    # Pull out epsilon, nu values from epsilon_ti and nu_ti matrices
+    for (i in seq_len(ncol(Xit))) {
+      
+      if (gsub("eps_", "", colnames(Xit)[i]) %in% taxa) {
+        Xit[,i] <- p_t$epsilon_ti[,which(taxa %in% gsub("eps_", "", colnames(Xit)[i]))]
+      } else if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
+        Xit[,i] <- p_t$nu_ti[,which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))]
+      }
     }
-    if( (taxa %in% fit_eps)[i] ){
-      loglik2_ti[t,i] = dnorm( epsilon_ti[t,i], 0, exp(p$logtau_i[i]), log=TRUE)
-    }
-    if( !is.na(Cobs_ti[t,i]) ){
-      loglik3_ti[t,i] = dnorm( log(Cobs_ti[t,i]), log(Chat_ti[t,i]), exp(p$ln_sdC), log=TRUE)
-    }
-    if( (taxa %in% fit_nu)[i] ){
-      loglik4_ti[t,i] = dnorm( p$nu_ti[t,i], 0, exp(p$logsigma_i[i]), log=TRUE)
-    }
-  }}
+    
+    # Stack columnwise
+    Xvec <- c(Xit)
+    
+    # Evaluate GMRF
+    loglik8_sem <- dgmrf(Xvec, mu = rep(0, length(Xvec)), Q = Q, log = TRUE)
+    
+  } else {
+    
+    for( i in seq_len(n_species) ){
+      for( t in seq_len(nrow(Bexp_ti)) ){
+        if( (taxa %in% fit_eps)[i] ){
+          loglik2_ti[t,i] = dnorm( epsilon_ti[t,i], 0, exp(p$logtau_i[i]), log=TRUE)
+        }
+        if( (taxa %in% fit_nu)[i] ){
+          loglik4_ti[t,i] = dnorm( p$nu_ti[t,i], 0, exp(p$logsigma_i[i]), log=TRUE)
+        }
+      }}
+    
+  }
+  
   #if(isFALSE(inherits(Bexp_ti,"advector"))) stop("Bexp_ti")
 
   # Comps
@@ -399,7 +441,7 @@ function( p,
   log_prior_value = log_prior( p )
 
   # Remove NAs to deal with missing values in Bobs_ti and Cobs_ti
-  jnll = jnll - ( sum(loglik1_ti) + sum(loglik2_ti) + sum(loglik3_ti) + sum(loglik4_ti) + sum(loglik5_tg2,na.rm=TRUE) + sum(loglik6_tg2) + sum(loglik7_tg2) + sum(log_prior_value,na.rm=TRUE) )
+  jnll = jnll - ( sum(loglik1_ti) + sum(loglik2_ti) + sum(loglik3_ti) + sum(loglik4_ti) + sum(loglik5_tg2,na.rm=TRUE) + sum(loglik6_tg2) + sum(loglik7_tg2) + loglik8_sem + sum(log_prior_value,na.rm=TRUE) )
   
   ###############
   # Derived
@@ -502,6 +544,7 @@ function( p,
   REPORT( loglik5_tg2 )
   REPORT( loglik6_tg2 )
   REPORT( loglik7_tg2 )
+  REPORT( loglik8_sem )
   REPORT( log_prior_value )
   REPORT( jnll )
   REPORT( TL_ti )

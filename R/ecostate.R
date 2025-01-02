@@ -139,6 +139,8 @@ function( taxa,
           fit_QB = vector(),
           fit_eps = vector(),
           fit_nu = vector(),
+          sem = "", 
+          covariates = NULL,
           log_prior = function(p) 0,
           settings = stanza_settings(taxa=taxa),
           control = ecostate_control() ){
@@ -151,12 +153,49 @@ function( taxa,
 
   #
   start_time = Sys.time()
-  if( !all(c(fit_B,fit_Q,fit_B0,fit_eps,fit_EE) %in% taxa) ){
-    if(isFALSE(control$silent)) warning("Some `fit_B`, `fit_Q`, `fit_B0`, or `fit_eps` not in `taxa`")
+  if( !all(c(fit_B,fit_Q,fit_B0,fit_eps,fit_EE,fit_nu) %in% taxa) ){
+    if(isFALSE(control$silent)) warning("Some `fit_B`, `fit_Q`, `fit_B0`, `fit_eps`, or `fit_nu` not in `taxa`")
   }
   if( any(biomass$Mass==0) ) stop("`biomass$Mass` cannot include zeros, given the assumed lognormal distribution")
   if( any(catch$Mass==0) ) stop("`catch$Mass` cannot include zeros, given the assumed lognormal distribution")
 
+  # Set up inputs for SEM
+  use_sem <- nchar(sem) > 0
+  if (use_sem) {
+    
+    if((length(fit_eps) > 0 | length(fit_nu > 0))) {
+      warning("fit_eps, fit_nu, and fit_phi are ignored if using SEM")
+    }
+    
+    if(control$process_error != "epsilon") {
+      warning("SEM forces innovation ('epsilon') process errors")
+      control$process_error <- "epsilon"
+    }
+    
+    proc_vars <- unique(regmatches(sem, gregexpr("(eps_|nu_|phi_)[^\\s,]+", sem, perl = TRUE))[[1]])
+    sem_vars <- c(colnames(covariates), proc_vars)
+    
+    sem <- make_dsem_ram(sem, times = years, variables = sem_vars)
+    
+    # Same checks as in dsem::dsem
+    
+    if (any((sem$model[, "direction"] == 2) & (sem$model[, 2] != 0))) {
+      stop("All two-headed arrows should have lag=0")
+    }
+    
+    if (!all(c(sem$model[, "first"], sem$model[, "second"]) %in% sem_vars)) {
+      stop("Some variable(s) in `sem` are not in `covariates`, or process errors are not correctly denoted")
+    }
+    
+    if (ncol(covariates) != length(unique(colnames(covariates)))) {
+      stop("Please check `colnames(covariates)` to confirm that all variables (columns) have a unique name")
+    }
+    
+    beta <- setNames(as.numeric(sem$model[,"start"]), sem$model[,"name"])
+    beta[is.na(beta)] <- 0
+    
+  }
+  
   # Set tmbad.sparse_hessian_compress
   config( tmbad.sparse_hessian_compress = control$tmbad.sparse_hessian_compress, DLL="RTMB" )
 
@@ -276,6 +315,8 @@ function( taxa,
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
+            beta = rep(0.01, ifelse(use_sem, length(beta), 1)),
+            mu = rep(0, ifelse(is.null(covariates), 1, ncol(covariates))),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
             logq_i = rep( log(1), n_species),
             s50_z = rep(1, n_selex),
@@ -306,17 +347,36 @@ function( taxa,
   map$log_K_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_K, seq_len(settings$n_g2), NA)) #  factor( rep(NA,length(p$K_g2)) )
   map$logit_d_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_d, seq_len(settings$n_g2), NA)) #  factor( rep(NA,length(p$K_g2)) )
 
-  #
-  p$logtau_i = ifelse(taxa %in% fit_eps, log(control$start_tau), NA)
-  map$logtau_i = factor(ifelse(taxa %in% fit_eps, seq_len(n_species), NA))
-  
-  #
-  p$logsigma_i = ifelse(taxa %in% fit_nu, log(control$start_tau), NA)
-  map$logsigma_i = factor(ifelse(taxa %in% fit_nu, seq_len(n_species), NA))
-
-  #
-  p$logpsi_g2 = ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA)
-  map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, seq_len(settings$n_g2), NA))
+  # Process error SDs
+  if (use_sem) {
+    
+    # Map off process error SDs (redundant with SEM SD parameters)
+    p$logtau_i = rep(NA, n_species); map$logtau_i = factor(rep(NA, n_species))
+    p$logsigma_i = rep(NA, n_species); map$logsigma_i = factor(rep(NA, n_species))
+    p$logpsi_g2 =  ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA)
+    map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, seq_len(settings$n_g2), NA))
+    
+    # Map off any fixed SEM parameters
+    map$beta = factor(ifelse(sem$model[,"parameter"] == "0", NA, seq_len(nrow(sem$model))))
+    
+  } else {
+    
+    # Map off path coefficients and covariate means
+    map$beta = map$mu = factor(NA)
+    
+    # Standard deviation of biomass process errors
+    p$logtau_i = ifelse(taxa %in% fit_eps, log(control$start_tau), NA)
+    map$logtau_i = factor(ifelse(taxa %in% fit_eps, seq_len(n_species), NA))
+    
+    # Standard deviation of consumption process errors
+    p$logsigma_i = ifelse(taxa %in% fit_nu, log(control$start_tau), NA)
+    map$logsigma_i = factor(ifelse(taxa %in% fit_nu, seq_len(n_species), NA))
+    
+    # Standard deviation of recruitment process errors
+    p$logpsi_g2 = ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA)
+    map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, seq_len(settings$n_g2), NA))
+    
+  }
 
   # Catches
   map$logF_ti = factor( ifelse(is.na(Cobs_ti), NA, seq_len(prod(dim(Cobs_ti)))) )
@@ -328,48 +388,84 @@ function( taxa,
   # Initial biomass-ratio ... turn off if no early biomass observations
   map$delta_i = factor( ifelse(taxa %in% fit_B0, seq_along(p$delta_i), NA) )
   
-  # process errors
-  if( control$process_error == "epsilon" ){
-    p$epsilon_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
-    map$epsilon_ti = array( seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
-    for(i in seq_len(n_species)){
-      if( is.na(p$logtau_i[i]) ){
-        p$epsilon_ti[,i] = 0
-        map$epsilon_ti[,i] = NA
-      }
+  # Process errors
+  if (use_sem) {
+    
+    # Variation in biomass
+    p$epsilon_ti = array(0, dim=c(nrow(Bobs_ti), n_species) )
+    map$epsilon_ti = array(seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
+    if(any(grepl("eps_", proc_vars))) {
+      map$epsilon_ti[,-match(gsub("eps_", "", proc_vars), taxa)] <- NA
+    } else {
+      map$epsilon_ti[,] <- NA
     }
     map$epsilon_ti = factor(map$epsilon_ti)
-  }else{
-    p$alpha_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
-    map$alpha_ti = array( seq_len(prod(dim(p$alpha_ti))), dim=dim(p$alpha_ti))
+    
+    # Variation in consumption
+    p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+    map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
+    if(any(grepl("nu_", proc_vars))) {
+      map$nu_ti[,-match(gsub("nu_", "", proc_vars), taxa)] <- NA 
+    } else {
+      map$nu_ti[,] <- NA
+    }
+    map$nu_ti = factor(map$nu_ti)
+    
+    # Variation in recruitment
+    p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
+    map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
+    if(any(grepl("phi_", proc_vars))) {
+      map$phi_tg2[,-match(gsub("phi_", "", proc_vars), taxa)] <- NA
+    } else {
+      map$phi_tg2[,] <- NA
+    }
+    map$phi_tg2 = factor(map$phi_tg2)
+    
+  } else {
+    
+    if( control$process_error == "epsilon" ){
+      p$epsilon_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+      map$epsilon_ti = array( seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
+      for(i in seq_len(n_species)){
+        if( is.na(p$logtau_i[i]) ){
+          p$epsilon_ti[,i] = 0
+          map$epsilon_ti[,i] = NA
+        }
+      }
+      map$epsilon_ti = factor(map$epsilon_ti)
+    }else{
+      p$alpha_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+      map$alpha_ti = array( seq_len(prod(dim(p$alpha_ti))), dim=dim(p$alpha_ti))
+      for(i in seq_len(n_species)){
+        if( is.na(p$logtau_i[i]) ){
+          p$alpha_ti[,i] = 0
+          map$alpha_ti[,i] = NA
+        }
+      }
+      map$alpha_ti = factor(map$alpha_ti)
+    }
+    # Variation in consumption
+    p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+    map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
     for(i in seq_len(n_species)){
-      if( is.na(p$logtau_i[i]) ){
-        p$alpha_ti[,i] = 0
-        map$alpha_ti[,i] = NA
+      if( is.na(p$logsigma_i[i]) ){
+        p$nu_ti[,i] = 0
+        map$nu_ti[,i] = NA
       }
     }
-    map$alpha_ti = factor(map$alpha_ti)
-  }
-  # Variation in consumption
-  p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
-  map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
-  for(i in seq_len(n_species)){
-    if( is.na(p$logsigma_i[i]) ){
-      p$nu_ti[,i] = 0
-      map$nu_ti[,i] = NA
+    map$nu_ti = factor(map$nu_ti)
+    # Variation in recruitment
+    p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
+    map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
+    for(g2 in seq_len(settings$n_g2)){
+      if( is.na(p$logpsi_g2[g2]) ){
+        p$phi_tg2[,g2] = 0
+        map$phi_tg2[,g2] = NA
+      }
     }
+    map$phi_tg2 = factor(map$phi_tg2)
+    
   }
-  map$nu_ti = factor(map$nu_ti)
-  # Variation in recruitment
-  p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
-  map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
-  for(g2 in seq_len(settings$n_g2)){
-    if( is.na(p$logpsi_g2[g2]) ){
-      p$phi_tg2[,g2] = 0
-      map$phi_tg2[,g2] = NA
-    }
-  }
-  map$phi_tg2 = factor(map$phi_tg2)
 
   # Measurement errors
   p$ln_sdB = log(0.1)
@@ -474,6 +570,7 @@ function( taxa,
   #cmb <- function(f, d) function(p) f(p, d) ## Helper to make closure
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
   #
+  #browser()
   obj <- MakeADFun( func = cmb( compute_nll,
                                 Bobs_ti = Bobs_ti,
                                 Cobs_ti = Cobs_ti,
@@ -491,7 +588,9 @@ function( taxa,
                                 settings = settings,
                                 log_prior = log_prior,
                                 stanza_data = stanza_data,
-                                DC_ij = DC_ij ),
+                                DC_ij = DC_ij, 
+                                sem = sem,
+                                covariates = covariates),
                     parameters = p,
                     map = map,
                     random = control$random,
