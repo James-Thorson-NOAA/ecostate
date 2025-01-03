@@ -169,6 +169,10 @@ function( taxa,
   use_sem <- nchar(sem) > 0
   if (use_sem) {
     
+    if(!require("dsem")) {
+      stop("package `dsem` required for SEM process errors")
+    }
+    
     if((length(fit_eps) > 0 | length(fit_nu > 0))) {
       warning("fit_eps, fit_nu, and fit_phi are ignored if using SEM")
     }

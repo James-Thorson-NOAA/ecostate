@@ -291,7 +291,7 @@ function( p,
   
   # Likelihood (process errors)
   if (!is.null(covariates)) {
-    
+  
     # SEM precision matrix
     Q <- make_matrices(setNames(p_t$beta, sem$model[,"name"]), sem$model, years, sem$variables)$Q_kk
     
