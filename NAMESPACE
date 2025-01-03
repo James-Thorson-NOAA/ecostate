@@ -34,6 +34,3 @@ importFrom(stats,nlminb)
 importFrom(stats,optimHess)
 importFrom(stats,weighted.mean)
 importFrom(utils,relist)
-
-# Edited by hand
-import("RTMB")

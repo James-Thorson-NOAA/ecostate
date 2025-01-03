@@ -21,6 +21,8 @@ compute_nll(
   fit_eps,
   fit_nu,
   stanza_data,
+  sem,
+  covariates,
   settings,
   control
 )
@@ -66,6 +68,14 @@ model should estimate annual process errors in dB/dt}
 model should estimate annual process errors in consumption \code{Q_ij}}
 
 \item{stanza_data}{output from \code{make_stanza_data}}
+
+\item{sem}{Specification for time-series structural equation model structure
+including lagged or simultaneous effects. Replaces \code{fit_eps} and \code{fit_nu};
+process errors are then specified with eps_ and nu_ prefixes, e.g. eps_X -> eps_X, 1 specifies
+autoregressive (lag-1) process errors in dB/dt. See Details section in
+\code{\link[dsem]{make_dsem_ram}} for more description}
+
+\item{covariates}{Matrix of covariates for use with SEM, with 1 row for each year}
 
 \item{settings}{Output from \code{\link[=stanza_settings]{stanza_settings()}}, used to define age-structured
 dynamics (called stanza-groups).}

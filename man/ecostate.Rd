@@ -27,6 +27,8 @@ ecostate(
   fit_QB = vector(),
   fit_eps = vector(),
   fit_nu = vector(),
+  sem = "",
+  covariates = NULL,
   log_prior = function(p) 0,
   settings = stanza_settings(taxa = taxa),
   control = ecostate_control()
@@ -110,6 +112,14 @@ model should estimate annual process errors in dB/dt}
 
 \item{fit_nu}{Character-vector listing \code{taxa} for which the
 model should estimate annual process errors in consumption \code{Q_ij}}
+
+\item{sem}{Specification for time-series structural equation model structure
+including lagged or simultaneous effects. Replaces \code{fit_eps} and \code{fit_nu};
+process errors are then specified with eps_ and nu_ prefixes, e.g. eps_X -> eps_X, 1 specifies
+autoregressive (lag-1) process errors in dB/dt. See Details section in
+\code{\link[dsem]{make_dsem_ram}} for more description}
+
+\item{covariates}{Matrix of covariates for use with SEM, with 1 row for each year}
 
 \item{log_prior}{A user-provided function that takes as input the list of
 parameters \code{out$obj$env$parList()} where \code{out} is the output from

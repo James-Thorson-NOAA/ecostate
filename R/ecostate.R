@@ -52,6 +52,12 @@
 #'        model should estimate annual process errors in dB/dt
 #' @param fit_nu Character-vector listing \code{taxa} for which the
 #'        model should estimate annual process errors in consumption \code{Q_ij}
+#' @param sem Specification for time-series structural equation model structure
+#'        including lagged or simultaneous effects. Replaces `fit_eps` and `fit_nu`; 
+#'        process errors are then specified with eps_ and nu_ prefixes, e.g. eps_X -> eps_X, 1 specifies
+#'        autoregressive (lag-1) process errors in dB/dt. See Details section in
+#'        \code{\link[dsem]{make_dsem_ram}} for more description
+#' @param covariates Matrix of covariates for use with SEM, with 1 row for each year
 #' @param fit_PB Character-vector listing \code{taxa} for which equilibrium
 #'        production per biomass is estimated.  Note that it is likely
 #'        a good idea to include a prior for any species for which this is estimated.
