@@ -71,7 +71,11 @@ dynamics (called stanza-groups).}
 
 \item{control}{output from \link{ecostate_control}}
 
-\item{DC_ij}{Diet projections matrix}
+\item{simulate_data}{Whether to simulate new data instead of computing the
+objective function, as used in the ecostate simulator routine}
+
+\item{simulate_random}{Whether to simulate new values of random effects.
+Only applies when \code{simulate_data==TRUE}}
 }
 \value{
 The joint negative log-likelihood including contribution of priors

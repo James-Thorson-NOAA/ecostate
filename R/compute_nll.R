@@ -11,12 +11,15 @@
 #' @param p list of parameters
 #' @param control output from \link{ecostate_control}
 #' @param project_vars function to integrate differential equation
-#' @param DC_ij Diet projections matrix
 #' @param Bobs_ti formatted matrix of biomass data
 #' @param Cobs_ti formatted matrix of catch data
 #' @param Nobs_ta_g2 formatted list of age-comp data
 #' @param Wobs_ta_g2 formatted list of weight-at-age data
 #' @param stanza_data output from \code{make_stanza_data}
+#' @param simulate_data Whether to simulate new data instead of computing the
+#'        objective function, as used in the ecostate simulator routine
+#' @param simulate_random Whether to simulate new values of random effects.
+#'        Only applies when \code{simulate_data==TRUE}
 #'
 #'
 #' @details
