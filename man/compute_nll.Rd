@@ -12,7 +12,6 @@ compute_nll(
   type_i,
   n_species,
   project_vars,
-  DC_ij,
   Bobs_ti,
   Cobs_ti,
   Nobs_ta_g2,
@@ -22,7 +21,9 @@ compute_nll(
   fit_nu,
   stanza_data,
   settings,
-  control
+  control,
+  simulate_data = FALSE,
+  simulate_random = FALSE
 )
 }
 \arguments{
@@ -40,8 +41,6 @@ compute_nll(
 \item{n_species}{number of species}
 
 \item{project_vars}{function to integrate differential equation}
-
-\item{DC_ij}{Diet projections matrix}
 
 \item{Bobs_ti}{formatted matrix of biomass data}
 
@@ -71,6 +70,8 @@ model should estimate annual process errors in consumption \code{Q_ij}}
 dynamics (called stanza-groups).}
 
 \item{control}{output from \link{ecostate_control}}
+
+\item{DC_ij}{Diet projections matrix}
 }
 \value{
 The joint negative log-likelihood including contribution of priors

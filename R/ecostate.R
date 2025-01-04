@@ -74,7 +74,7 @@
 #'
 #' @importFrom TMB config
 #' @importFrom checkmate assertDouble assertFactor assertCharacter assertList
-#' @importFrom stats dnorm nlminb optimHess weighted.mean
+#' @importFrom stats dnorm nlminb optimHess weighted.mean rgamma rmultinom rnorm
 #' @importFrom igraph graph_from_adjacency_matrix
 #' @importFrom ggplot2 ggplot aes
 #' @importFrom ggnetwork ggnetwork geom_edges geom_nodes geom_nodetext
