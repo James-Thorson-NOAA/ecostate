@@ -490,15 +490,15 @@ function( taxa,
                                 fit_nu = fit_nu,
                                 settings = settings,
                                 log_prior = log_prior,
-                                stanza_data = stanza_data,
-                                DC_ij = DC_ij ),
+                                #DC_ij = DC_ij,
+                                stanza_data = stanza_data ),
                     parameters = p,
                     map = map,
                     random = control$random,
                     profile = control$profile,
                     silent = control$silent )
 
-  # Make TMB object
+  # Make RTMB object
   #browser()
   # compute_nll(p)
   # environment(compute_nll) <- data
@@ -545,6 +545,31 @@ function( taxa,
   rep = obj$report()
   parhat = obj$env$parList()
 
+  #
+  simulator = function( parlist = parhat,   # can't have RHS of simulator = RHS of compute_nll
+                        simulate_random = TRUE ){
+    compute_nll( p = parlist,               # can't have RHS of simulator = RHS of compute_nll
+                Bobs_ti = Bobs_ti,
+                Cobs_ti = Cobs_ti,
+                Nobs_ta_g2 = Nobs_ta_g2,
+                Wobs_ta_g2 = Wobs_ta_g2,
+                noB_i = noB_i,
+                type_i = type_i,
+                n_species = n_species,
+                years = years,
+                taxa = taxa,
+                project_vars = project_vars,
+                control = control,
+                fit_eps = fit_eps,
+                fit_nu = fit_nu,
+                settings = settings,
+                log_prior = log_prior,
+                stanza_data = stanza_data,
+                #DC_ij = DC_ij,
+                simulate_random = simulate_random,
+                simulate_data = TRUE )
+  }
+
   # Sanity checks
   if( any(rep$B_ti==0) ){
     warning("Some `B_ti=0` which typically occurs in multistanza models when W<Wmat for one or more years")
@@ -583,6 +608,7 @@ function( taxa,
     control = control,
     settings = settings,
     log_prior = log_prior,
+    stanza_data = stanza_data,
     Bobs_ti = Bobs_ti,
     Cobs_ti = Cobs_ti,
     Nobs_ta_g2 = Nobs_ta_g2,
@@ -611,7 +637,8 @@ function( taxa,
     tmb_inputs = list(p=p, map=map),
     call = match.call(),
     run_time = Sys.time() - start_time,
-    internal = internal
+    internal = internal,
+    simulator = simulator
   )
 
   class(out) = "ecostate"

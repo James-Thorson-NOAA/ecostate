@@ -40,7 +40,7 @@ function( p,
           type_i,
           n_species,
           project_vars,
-          DC_ij,
+          #DC_ij,
           Bobs_ti,
           Cobs_ti,
           Nobs_ta_g2,
@@ -50,7 +50,9 @@ function( p,
           fit_nu,
           stanza_data,
           settings,
-          control ) {
+          control,
+          simulate_data = FALSE,
+          simulate_random = FALSE ) {
 
   
   # Necessary in packages
@@ -143,8 +145,34 @@ function( p,
   #               dimnames=list(NULL,rownames(p$Y_zz),colnames(p$Y_zz)) ) # dimnames-list dimension matching
   #Y_tzz[1,,] = Y_zz
 
+  # Hyperdistribution for random effects
+  for( i in seq_len(n_species) ){
+  for( t in seq_len(nrow(Bobs_ti)) ){
+    if( (taxa %in% fit_eps)[i] ){
+      loglik2_ti[t,i] = dnorm( epsilon_ti[t,i], 0, exp(p$logtau_i[i]), log=TRUE)
+      if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
+        epsilon_ti[t,i] = rnorm( n=1, mean=0, sd=exp(p$logtau_i[i]) )
+      }
+    }
+    if( (taxa %in% fit_nu)[i] ){
+      loglik4_ti[t,i] = dnorm( p$nu_ti[t,i], 0, exp(p$logsigma_i[i]), log=TRUE)
+      if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
+        p$nu_ti[t,i] = rnorm( n=1, mean=0, sd=exp(p$logsigma_i[i]) )
+      }
+    }
+  }}
+  for( g2 in seq_len(settings$n_g2) ){
+  for( t in seq_len(nrow(Bobs_ti)) ){
+    if( (settings$unique_stanza_groups %in% settings$fit_phi)[g2] ){
+      loglik7_tg2[t,g2] = dnorm( p$phi_tg2[t,g2], 0, exp(p$logpsi_g2[g2]), log=TRUE)
+      if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
+        p$phi_tg2[t,g2] = rnorm( n=1, mean=0, sd=exp(p$logpsi_g2[g2]) )
+      }
+    }
+  }}
+
   # Loop through years
-  for( t in 2:nrow(B_ti) ){
+  for( t in 2:nrow(Bobs_ti) ){
   #for( t in 2:66 ){
     # Assemble inputs
     p_t = p
@@ -273,25 +301,22 @@ function( p,
   Z_ti = F_ti + M_ti 
   
   # likelihood
-  Bobs_ti = OBS(Bobs_ti)
-  Cobs_ti = OBS(Cobs_ti)
   Bexp_ti = B_ti * (rep(1,nrow(B_ti)) %*% t(exp(p$logq_i)))
   for( i in seq_len(n_species) ){
   for( t in seq_len(nrow(Bexp_ti)) ){
     if( !is.na(Bobs_ti[t,i]) ){
       loglik1_ti[t,i] = dnorm( log(Bobs_ti[t,i]), log(Bexp_ti[t,i]), exp(p$ln_sdB), log=TRUE)
-    }
-    if( (taxa %in% fit_eps)[i] ){
-      loglik2_ti[t,i] = dnorm( epsilon_ti[t,i], 0, exp(p$logtau_i[i]), log=TRUE)
+      if( isTRUE(simulate_data) ){
+        Bobs_ti[t,i] = exp(rnorm(n=1, mean=log(Bexp_ti[t,i]), sd=exp(p$ln_sdB)))
+      }
     }
     if( !is.na(Cobs_ti[t,i]) ){
       loglik3_ti[t,i] = dnorm( log(Cobs_ti[t,i]), log(Chat_ti[t,i]), exp(p$ln_sdC), log=TRUE)
-    }
-    if( (taxa %in% fit_nu)[i] ){
-      loglik4_ti[t,i] = dnorm( p$nu_ti[t,i], 0, exp(p$logsigma_i[i]), log=TRUE)
+      if( isTRUE(simulate_data) ){
+        Cobs_ti[t,i] = exp(rnorm(n=1, mean=log(Chat_ti[t,i]), sd=exp(p$ln_sdC)))
+      }
     }
   }}
-  #if(isFALSE(inherits(Bexp_ti,"advector"))) stop("Bexp_ti")
 
   # Comps
   dmultinomial = function( x, prob, log=TRUE ){
@@ -305,30 +330,24 @@ function( p,
     r = sum(s) - logD
     if(log){r}else{exp(r)}
   }
+  rdirichlet <- function(alpha){
+    x <- rgamma( length(alpha), alpha)
+    return(x / sum(x))
+  }
   #selex_index = 0
   for( index in seq_along(Nobs_ta_g2) ){
     g2 = match( names(Nobs_ta_g2)[index], settings$unique_stanza_groups )
-    #which_z = which( stanza_data$X_zz[,'g2'] == g2 )
-    #selex_a = plogis( (stanza_data$X_zz[which_z,'AGE'] - p$s50_z[index])/p$srate_z[index] )
-    #which_a = which( stanza_data$X_zz[which_z,'AGE'] %in% unique(stanza_data$X_zz[which_z,'age_class']) )
-    #selex_a = plogis( (stanza_data$X_zz[which_z[which_a],'AGE'] - p$s50_z[index])/p$srate_z[index] )
     Xg2_zz = stanza_data$X_zz_g2[[g2]]
     Yg2_tzz = Y_tzz_g2[[g2]]
     selex_a = plogis( (Xg2_zz[,'AGE'] - p$s50_z[index])/p$srate_z[index] )
     for( index2 in seq_len(nrow(Nobs_ta_g2[[index]])) ){
       t = match( rownames(Nobs_ta_g2[[index]])[index2], years )
       # Comps are average-year abundance (smears cohorts across adjacent years)
-      #Nexp_a = rep(0, max(stanza_data$X_zz[which_z,'age_class']+1)) * p$s50_z / p$s50_z # 0 through MaxAge so +1 length
-      #for(z in which_z){
-      #  Nexp_a[stanza_data$X_zz[z,'age_class']+1] = Nexp_a[stanza_data$X_zz[z,'age_class']+1] + selex_a[z]*Y_tzz[t,z,'NageS']
-      #}
       Nexp_a = rep(0, max(Xg2_zz[,'age_class']+1)) * p$s50_z[index] / p$s50_z[index] # 0 through MaxAge so +1 length
       for( z in seq_len(nrow(Xg2_zz)) ){
         Nexp_a[Xg2_zz[z,'age_class']+1] = Nexp_a[Xg2_zz[z,'age_class']+1] + selex_a[z] * exp(Yg2_tzz[t,z,'log_NageS'])
       }
       # Comps are end-of-year abundance
-      #which_a = which( stanza_data$X_zz[which_z,'AGE'] %in% unique(stanza_data$X_zz[which_z,'age_class']) )
-      #Nexp_a = selex_a * Y_tzz[t,which_z[which_a],'NageS']
       # Record comps
       Nexp_ta_g2[[index]][index2,] = Nexp_a[-1] + settings$min_agecomp_prob  # Remove age-0 ... add 1e-12 to avoid prob=0, which crashes gradients
       # Remove any NAs
@@ -340,10 +359,19 @@ function( p,
           loglik5_tg2[t,g2] = dmultinomial( obs, prob=prob, log=TRUE )
           # relative deviance: https://stats.stackexchange.com/questions/186560/what-is-multinomial-deviance-in-the-glmnet-package
           # dev5_tg2[t,g2] = loglik5_tg2[t,g2] - dmultinomial( obs, prob=obs/sum(obs), log=TRUE )
+          if( isTRUE(simulate_data) ){
+            Nobs_ta_g2[[index]][index2,which_obs] = rmultinom( n=1, size=sum(obs), prob=prob )
+          }
         }else if( settings$comp_weight == "dir" ){
           loglik5_tg2[t,g2] = ddirichlet( obs/sum(obs), alpha=prob*exp(p$compweight_z[index]), log=TRUE )
+          if( isTRUE(simulate_data) ){
+            Nobs_ta_g2[[index]][index2,which_obs] = sum(obs) * rdirichlet( prob*exp(p$compweight_z[index]) )
+          }
         }else{
           loglik5_tg2[t,g2] = ddirmult( obs, prob=prob, ln_theta=p$compweight_z[index], log=TRUE )
+          if( isTRUE(simulate_data) ){
+            stop("comp_weight method not yet implemented for simulator")
+          }
         }
       }
     }
@@ -358,14 +386,6 @@ function( p,
     #weight_index = max(weight_index) + 1:2
     for( index2 in seq_len(nrow(Wobs_ta_g2[[index]])) ){
       t = match( rownames(Wobs_ta_g2[[index]])[index2], years )
-      #Wexp_a = Nexp_a = rep(0,max(stanza_data$X_zz[which_z,'age_class']+1)) # 0 through MaxAge so +1 length
-      #for(z in which_z){
-      #  Nexp_a[stanza_data$X_zz[z,'age_class']+1] = Nexp_a[stanza_data$X_zz[z,'age_class']+1] + Y_tzz[t,z,'NageS']
-      #}
-      #for(z in which_z){
-      #  prop = Y_tzz[t,z,'NageS'] / Nexp_a[stanza_data$X_zz[z,'age_class']+1]
-      #  Wexp_a[stanza_data$X_zz[z,'age_class']+1] = Wexp_a[stanza_data$X_zz[z,'age_class']+1] + prop * Y_tzz[t,z,'WageS']
-      #}
       Wexp_a = Nexp_a = rep(0,max(Xg2_zz[,'age_class']+1)) # 0 through MaxAge so +1 length
       for( z in seq_len(nrow(Xg2_zz)) ){
         #Nexp_a[Xg2_zz[z,'age_class']+1] = Nexp_a[Xg2_zz[z,'age_class']+1] + Yg2_tzz[t,z,'NageS']
@@ -383,17 +403,13 @@ function( p,
       for( index3 in seq_along(obs) ){
         if( !is.na(obs[index3]) ){
           loglik6_tg2[t,g2] = loglik6_tg2[t,g2] + dnorm(log(obs[index3]), mean=log(mu[index3]), sd=exp(p$ln_sdW_z[index]), log=TRUE)
+          if( isTRUE(simulate_data) ){
+            Wobs_ta_g2[[index]][index2,index3] = exp(rnorm( n=1, mean=log(mu[index3]), sd=exp(p$ln_sdW_z[index]) ))
+          }
         }
       }
     }
   }
-
-  for( g2 in seq_len(settings$n_g2) ){
-  for( t in seq_len(nrow(Bexp_ti)) ){
-    if( (settings$unique_stanza_groups %in% settings$fit_phi)[g2] ){
-      loglik7_tg2[t,g2] = dnorm( p$phi_tg2[t,g2], 0, exp(p$logpsi_g2[g2]), log=TRUE)
-    }
-  }}
 
   # Calculate priors
   log_prior_value = log_prior( p )
@@ -523,5 +539,19 @@ function( p,
     ADREPORT( do.call("c", derived_values) )
   }
 
-  return(jnll)
+  if( isTRUE(simulate_data) ){
+    out = list( epsilon_ti = epsilon_ti,
+                nu_ti = p$nu_ti,
+                phi_tg2 = p$phi_tg2,
+                B_ti = B_ti,
+                Cobs_ti = Cobs_ti,
+                Chat_ti = Chat_ti,
+                Bobs_ti = Bobs_ti,
+                Bexp_ti = Bexp_ti,
+                Nobs_ta_g2 = Nobs_ta_g2,
+                Wobs_ta_g2 = Wobs_ta_g2 )
+  }else{
+    out = jnll
+  }
+  return(out)
 }
