@@ -51,6 +51,8 @@ function( p,
           log_prior,
           fit_eps,
           fit_nu,
+          sem, 
+          covariates,
           stanza_data,
           settings,
           control,
@@ -149,30 +151,78 @@ function( p,
   #Y_tzz[1,,] = Y_zz
 
   # Hyperdistribution for random effects
-  for( i in seq_len(n_species) ){
-  for( t in seq_len(nrow(Bobs_ti)) ){
-    if( (taxa %in% fit_eps)[i] ){
-      loglik2_ti[t,i] = dnorm( epsilon_ti[t,i], 0, exp(p$logtau_i[i]), log=TRUE)
-      if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
-        epsilon_ti[t,i] = rnorm( n=1, mean=0, sd=exp(p$logtau_i[i]) )
+  use_sem <- class(sem) == "dsem_ram"
+  if (use_sem) {
+    
+    # SEM precision matrix
+    Q <- make_matrices(setNames(p_t$beta, sem$model[,"name"]), sem$model, years, sem$variables)$Q_kk
+    
+    # Observations for SEM likelihood
+    Xit <- matrix(NA, nrow = length(years), ncol = length(sem$variables))
+    colnames(Xit) <- sem$variables
+    Xit[,colnames(covariates)] <- covariates
+    
+    # Subtract covariate means
+    Xit[,colnames(covariates)] <- sweep(Xit[,colnames(covariates), drop = FALSE], 2, p_t$mu)
+    
+    # Pull out epsilon, nu values from epsilon_ti and nu_ti matrices
+    for (i in seq_len(ncol(Xit))) {
+      
+      if (gsub("eps_", "", colnames(Xit)[i]) %in% taxa) {
+        Xit[,i] <- p_t$epsilon_ti[,which(taxa %in% gsub("eps_", "", colnames(Xit)[i]))]
+      } else if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
+        Xit[,i] <- p_t$nu_ti[,which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))]
       }
     }
-    if( (taxa %in% fit_nu)[i] ){
-      loglik4_ti[t,i] = dnorm( p$nu_ti[t,i], 0, exp(p$logsigma_i[i]), log=TRUE)
-      if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
-        p$nu_ti[t,i] = rnorm( n=1, mean=0, sd=exp(p$logsigma_i[i]) )
+    
+    # Stack columnwise
+    Xvec <- c(Xit)
+    
+    # Evaluate GMRF
+    loglik8_sem <- dgmrf(Xvec, mu = rep(0, length(Xvec)), Q = Q, log = TRUE)
+    
+    if (isTRUE(simulate_data) & isTRUE(simulate_random)) {
+      
+      Xit_sim <- matrix(RTMB:::rgmrf0(n = 1, Q = Q), nrow = nrow(Xit), ncol = ncol(Xit), byrow = FALSE)
+      colnames(Xit_sim) <- colnames(Xit)
+      Xit_sim[,colnames(covariates)] <- sweep(Xit_sim[,colnames(covariates), drop = FALSE], 2, p_t$mu, FUN = "+")
+      
+      for (i in seq_len(ncol(Xit))) {
+        if (gsub("eps_", "", colnames(Xit)[i]) %in% taxa) {
+          epsilon_ti[, which(taxa %in% gsub("eps_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
+        } else if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
+          p$nu_ti[, which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
+        }
       }
+      
     }
-  }}
-  for( g2 in seq_len(settings$n_g2) ){
-  for( t in seq_len(nrow(Bobs_ti)) ){
-    if( (settings$unique_stanza_groups %in% settings$fit_phi)[g2] ){
-      loglik7_tg2[t,g2] = dnorm( p$phi_tg2[t,g2], 0, exp(p$logpsi_g2[g2]), log=TRUE)
-      if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
-        p$phi_tg2[t,g2] = rnorm( n=1, mean=0, sd=exp(p$logpsi_g2[g2]) )
-      }
-    }
-  }}
+    
+  } else {
+    for( i in seq_len(n_species) ){
+      for( t in seq_len(nrow(Bobs_ti)) ){
+        if( (taxa %in% fit_eps)[i] ){
+          loglik2_ti[t,i] = dnorm( epsilon_ti[t,i], 0, exp(p$logtau_i[i]), log=TRUE)
+          if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
+            epsilon_ti[t,i] = rnorm( n=1, mean=0, sd=exp(p$logtau_i[i]) )
+          }
+        }
+        if( (taxa %in% fit_nu)[i] ){
+          loglik4_ti[t,i] = dnorm( p$nu_ti[t,i], 0, exp(p$logsigma_i[i]), log=TRUE)
+          if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
+            p$nu_ti[t,i] = rnorm( n=1, mean=0, sd=exp(p$logsigma_i[i]) )
+          }
+        }
+      }}
+    for( g2 in seq_len(settings$n_g2) ){
+      for( t in seq_len(nrow(Bobs_ti)) ){
+        if( (settings$unique_stanza_groups %in% settings$fit_phi)[g2] ){
+          loglik7_tg2[t,g2] = dnorm( p$phi_tg2[t,g2], 0, exp(p$logpsi_g2[g2]), log=TRUE)
+          if( isTRUE(simulate_data) & isTRUE(simulate_random) ){
+            p$phi_tg2[t,g2] = rnorm( n=1, mean=0, sd=exp(p$logpsi_g2[g2]) )
+          }
+        }
+      }}
+  }
 
   # Loop through years
   for( t in 2:nrow(Bobs_ti) ){
@@ -418,7 +468,7 @@ function( p,
   log_prior_value = log_prior( p )
 
   # Remove NAs to deal with missing values in Bobs_ti and Cobs_ti
-  jnll = jnll - ( sum(loglik1_ti) + sum(loglik2_ti) + sum(loglik3_ti) + sum(loglik4_ti) + sum(loglik5_tg2,na.rm=TRUE) + sum(loglik6_tg2) + sum(loglik7_tg2) + sum(log_prior_value,na.rm=TRUE) )
+  jnll = jnll - ( sum(loglik1_ti) + sum(loglik2_ti) + sum(loglik3_ti) + sum(loglik4_ti) + sum(loglik5_tg2,na.rm=TRUE) + sum(loglik6_tg2) + sum(loglik7_tg2) + loglik8_sem + sum(log_prior_value,na.rm=TRUE) )
   
   ###############
   # Derived
@@ -521,6 +571,7 @@ function( p,
   REPORT( loglik5_tg2 )
   REPORT( loglik6_tg2 )
   REPORT( loglik7_tg2 )
+  REPORT( loglik8_sem )
   REPORT( log_prior_value )
   REPORT( jnll )
   REPORT( TL_ti )
