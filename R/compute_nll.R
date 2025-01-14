@@ -109,6 +109,7 @@ function( p,
   TL_ti = dBdt0_ti = M_ti = m_ti = G_ti = g_ti = M2_ti = m2_ti = Bmean_ti = Chat_ti = B_ti = Bhat_ti = matrix( NA, ncol=n_species, nrow=nrow(Bobs_ti) )
   loglik1_ti = loglik2_ti = loglik3_ti = loglik4_ti = matrix( 0, ncol=n_species, nrow=nrow(Bobs_ti) )  # Missing = 0
   loglik5_tg2 = loglik6_tg2 = loglik7_tg2 = matrix( 0, nrow=nrow(Bobs_ti), ncol=length(settings$unique_stanza_groups) )
+  loglik8_sem = 0
   Q_tij = array( NA, dim=c(nrow(Bobs_ti),n_species,n_species) )
   Nexp_ta_g2 = Nobs_ta_g2
   Wexp_ta_g2 = Wobs_ta_g2
@@ -140,7 +141,7 @@ function( p,
   m20_ti = out_initial$m2_i
 
   # 
-  Y_tzz_g2 = NULL
+  Y_tzz_g2 = vector("list", length(Y_zz_g2))
   for( g2 in seq_along(Y_zz_g2) ){
     Y_tzz_g2[[g2]] = array( 0.0, dim=c(nrow(Bobs_ti),dim(p$Y_zz_g2[[g2]])),
                  dimnames=list(NULL,rownames(p$Y_zz_g2[[g2]]),colnames(p$Y_zz_g2[[g2]])) )
@@ -151,15 +152,17 @@ function( p,
   #Y_tzz[1,,] = Y_zz
 
   # Hyperdistribution for random effects
-  use_sem <- class(sem) == "dsem_ram"
+  use_sem <- class(sem) == "data.frame"
   if (use_sem) {
     
     # SEM precision matrix
-    Q <- make_matrices(setNames(p_t$beta, sem$model[,"name"]), sem$model, years, sem$variables)$Q_kk
+    variables <- unique(c(sem$first, sem$second))
+    sem_mat <- dsem:::make_matrices(p_t$beta, sem, years, variables)
+    Q <- Matrix::t(sem_mat$IminusP_kk) %*% sem_mat$invV_kk %*% sem_mat$IminusP_kk
     
     # Observations for SEM likelihood
-    Xit <- matrix(NA, nrow = length(years), ncol = length(sem$variables))
-    colnames(Xit) <- sem$variables
+    Xit <- matrix(NA, nrow = length(years), ncol = length(variables))
+    colnames(Xit) <- variables
     Xit[,colnames(covariates)] <- covariates
     
     # Subtract covariate means
@@ -172,6 +175,8 @@ function( p,
         Xit[,i] <- p_t$epsilon_ti[,which(taxa %in% gsub("eps_", "", colnames(Xit)[i]))]
       } else if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
         Xit[,i] <- p_t$nu_ti[,which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))]
+      } else if (gsub("phi_", "", colnames(Xit)[i]) %in% settings$unique_stanza_groups) {
+        Xit[,i] <- p_t$phi_tg2[,which(settings$unique_stanza_groups %in% gsub("phi_", "", colnames(Xit)[i]))]
       }
     }
     
@@ -192,6 +197,10 @@ function( p,
           epsilon_ti[, which(taxa %in% gsub("eps_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
         } else if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
           p$nu_ti[, which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
+        } else if (gsub("phi_", "", colnames(Xit)[i]) %in% settings$unique_stanza_groups) {
+          p$phi_tg2[, which(settings$unique_stanza_groups %in% gsub("phi_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
+        } else if (colnames(Xit)[i] %in% colnames(covariates)) {
+          covariates[,which(colnames(covariates) == colnames(Xit)[i])] <- Xit_sim[,i]
         }
       }
       
@@ -603,7 +612,8 @@ function( p,
                 Bobs_ti = Bobs_ti,
                 Bexp_ti = Bexp_ti,
                 Nobs_ta_g2 = Nobs_ta_g2,
-                Wobs_ta_g2 = Wobs_ta_g2 )
+                Wobs_ta_g2 = Wobs_ta_g2, 
+                covariates = covariates)
   }else{
     out = jnll
   }

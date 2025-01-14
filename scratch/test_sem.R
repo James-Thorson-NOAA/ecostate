@@ -39,12 +39,13 @@ log_prior <- function(p){
 }
 
 # Taxa to include
-taxa <- c( "NFS", "Pollock", "Copepod", "Chloro", "Krill" )
+taxa <- c( "NFS", "Pollock", "Copepod", "Chloro", "Krill", "Arrowtooth", "Cod")
 
 # Parameters to estimate
 fit_Q <- c("Pollock", "Copepod", "Chloro", "Krill")
-fit_B0 <- c("Pollock", "NFS")
-fit_B <- c("Cod", "NFS")  
+fit_B0 <- c("Pollock", "Arrowtooth", "Cod", "NFS")
+fit_EE <- vector()
+fit_B <- vector()  #c("Cod", "NFS")  
 fit_eps <- "Pollock"
 
 # DSEM paths
@@ -52,8 +53,9 @@ sem <- "
   cold_pool -> eps_Pollock, 1, beta_cp_plk, 0,
   eps_Pollock -> eps_Pollock, 1, rho_plk, 0,
   cold_pool <-> cold_pool, 0, sigma_cp, 0.1
-  eps_Pollock <-> eps_Pollock, 0, sigma_plk, 0.1
+  eps_Pollock <-> eps_Pollock, 0, NA, 0.5
 "
+
 
 # DSEM additional covariates
 covariates <- structure(
@@ -70,72 +72,10 @@ covariates <- structure(
 agecomp = list()
 weight = list()
 fit_nu <- vector()
-fit_EE <- vector()
 fit_PB <- vector()
 fit_QB <- vector()
 settings <- stanza_settings(taxa=taxa)
-control <- ecostate_control(n_steps = 20, start_tau = 0.01, tmbad.sparse_hessian_compress = 0, silent = FALSE)
-
-# Function to make DSEM precision matrix ------------------
-
-make_matrices <-
-  function( beta_p,
-            model,
-            times,
-            variables ){
-    
-    model <- as.data.frame(model)
-    
-    if(missing(beta_p)){
-      model_unique = model[match(unique(model$parameter),model$parameter),]
-      beta_p =  as.numeric(model_unique$start)
-    }
-    
-    # Loop through paths
-    P_kk = drop0(sparseMatrix( i=1, j=1, x=0, dims=rep(length(variables)*length(times),2) ))   # Make with a zero
-    #P_kk = AD(P_kk)
-    G_kk = (P_kk)
-    for( i in seq_len(nrow(model)) ){
-      lag = as.numeric(model[i,2])
-      L_tt = sparseMatrix( i = seq(lag+1,length(times)),
-                           j = seq(1,length(times)-lag),
-                           x = 1,
-                           dims = rep(length(times),2) )
-      
-      P_jj = sparseMatrix( i = match(model[i,'second'],variables),
-                           j = match(model[i,'first'],variables),
-                           x = 1,
-                           dims = rep(length(variables),2) )
-      
-      tmp_kk = (kronecker(P_jj, L_tt))
-      
-      # Assemble
-      if(abs(as.numeric(model[i,'direction']))==1){
-        P_kk = P_kk + beta_p[as.integer(model$parameter[i])] * tmp_kk # AD(tmp_kk)
-      }else{
-        G_kk = G_kk + beta_p[as.integer(model$parameter[i])] * tmp_kk # AD(tmp_kk)
-      }
-    }
-    
-    # Diagonal component
-    I_kk = Diagonal(nrow(P_kk))
-    
-    # Assemble
-    IminusP_kk = I_kk - P_kk
-    invV_kk = AD(G_kk)
-    invV_kk@x = 1 / G_kk@x^2
-    Q_kk = t(IminusP_kk) %*% invV_kk %*% IminusP_kk
-    
-    out = list(
-      "P_kk" = P_kk,
-      "G_kk" = G_kk,
-      "invV_kk" = invV_kk,
-      "IminusP_kk" = IminusP_kk,
-      "Q_kk" = Q_kk
-    )
-    return(out)
-  }
-
+control <- ecostate_control(n_steps = 20, start_tau = 0.01, tmbad.sparse_hessian_compress = 0)
 
 # Initial run (to return simulate()) ----------------------
 
@@ -143,9 +83,10 @@ make_matrices <-
 out0 <- ecostate(
   taxa = taxa, years = years, catch = catch, biomass = biomass, 
   PB = PB, QB = QB, B = B, DC = DC, EE = EE, X = X, 
-  type = type, U = U, fit_Q = fit_Q, fit_B0 = fit_B0, fit_B = fit_B, 
+  type = type, U = U, fit_Q = fit_Q, fit_B0 = fit_B0, fit_B = fit_B, fit_EE = fit_EE,
   sem = sem, covariates = covariates,
-  settings = settings, control = control
+  settings = settings, control = control, 
+  debug = FALSE
 )
 
 # Simulation testing --------------------------------------
@@ -173,22 +114,24 @@ for (i in 1:nrow(beta_grid)) {
     par$beta[1:2] <- beta_grid[i,] 
     sim_ij <- out0$simulator(par)
     
-    catch = na.omit(cbind(
+    catch <- na.omit(cbind(
       expand.grid( "Year" = rownames(sim_ij$Cobs_ti),
                    "Taxon" = colnames(sim_ij$Cobs_ti) ),
       "Mass" = as.vector(sim_ij$Cobs_ti)
     ))
     
-    biomass = na.omit(cbind(
+    biomass <- na.omit(cbind(
       expand.grid( "Year" = rownames(sim_ij$Bobs_ti),
                    "Taxon" = colnames(sim_ij$Bobs_ti) ),
       "Mass" = as.vector(sim_ij$Bobs_ti)
     ))
     
+    covariates <- sim_ij$covariates
+    
     fit_ij <- ecostate(
       taxa = taxa, years = years, catch = catch, biomass = biomass, 
       PB = PB, QB = QB, B = B, DC = DC, EE = EE, X = X, 
-      type = type, U = U, fit_Q = fit_Q, fit_B0 = fit_B0, fit_B = fit_B, 
+      type = type, U = U, fit_Q = fit_Q, fit_B0 = fit_B0, fit_B = fit_B, fit_EE = fit_EE,
       sem = sem, covariates = covariates,
       settings = settings, control = control
     )
@@ -201,10 +144,10 @@ for (i in 1:nrow(beta_grid)) {
 
 parhat_long <- reshape2::melt(parhat)
 colnames(parhat_long) <- c("index", "parameter", "run", "estimate")
-parhat_long$true <- ifelse(parhat_long$parameter == 4, beta_grid[parhat_long$index, 1], ifelse(parhat_long$parameter == 5, beta_grid[parhat_long$index,2], out0$opt$par[parhat_long$parameter]))
+parhat_long$true <- ifelse(parhat_long$parameter == 5, beta_grid[parhat_long$index, 1], ifelse(parhat_long$parameter == 6, beta_grid[parhat_long$index,2], out0$opt$par[parhat_long$parameter]))
 
 parhat_long |> 
-  filter(parameter == 4) |> 
+  filter(parameter == 5) |> 
   ggplot(aes(true, estimate, group = true)) + 
   geom_boxplot(fill = "black", alpha = 0.25, color = "grey40") + 
   geom_point() + 
@@ -214,7 +157,7 @@ parhat_long |>
 ggsave("C:/Users/goodm/Downloads/cold_pool_sim.png", height = 4, width = 6, units = "in", dpi = 300)
 
 parhat_long |> 
-  filter(parameter == 5) |> 
+  filter(parameter == 6) |> 
   ggplot(aes(true, estimate, group = true)) + 
   geom_boxplot(fill = "black", alpha = 0.25, color = "grey40") + 
   geom_point() + 
@@ -224,7 +167,7 @@ parhat_long |>
 ggsave("C:/Users/goodm/Downloads/epsilon_pollock_AR1.png", height = 4, width = 6, units = "in", dpi = 300)
 
 parhat_long |> 
-  filter(parameter != 4 & parameter != 5) |> 
+  filter(parameter != 5 & parameter != 6) |> 
   ggplot(aes(factor(parameter), estimate)) + 
   geom_point(aes(y = true), color = "red", size = 4) + 
   geom_point(alpha = 0.25) + 
