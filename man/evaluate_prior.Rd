@@ -4,7 +4,7 @@
 \alias{evaluate_prior}
 \title{EcoState priors}
 \usage{
-evaluate_prior(priors, p, taxa, years, stanza_groups, sem = NULL)
+evaluate_prior(priors, p, taxa, years, stanza_groups, sem = "")
 }
 \arguments{
 \item{priors}{Either:
