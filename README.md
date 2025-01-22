@@ -26,10 +26,21 @@ browseVignettes("ecostate")
 
 # More details 
 
-For more background please read:
+For more background, please read:
 
-Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. EcoState:  Extending Ecopath with Ecosim to estimate biological parameters and process errors using RTMB and time-series data.  Pre-print URL: https://doi.org/10.32942/X2QK81 
+### For state-space mass-balance equilibrium and biomass-dynamic modelling
+Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. (In press) The benefits of hierarchical ecosystem models: demonstration using a new state-space mass-balance model EcoState.  Fish and Fisheries.  https://doi.org/10.1111/faf.12874
 
-or the updated version:
+### For age-structured dynamics and bottom-up linkages to animal growth:
+Thorson, J. T., Aydin, K. H., Cheng, M., Dias, B. S., Kimmel, D. G., & Kristensen, K. (2025). Bottom-up interactions in age-structured stock assessment and state-space mass-balance modelling. https://ecoevorxiv.org/repository/view/8411/
 
-Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. (In press) The benefits of hierarchical ecosystem models: demonstration using a new state-space mass-balance model EcoState.  Fish and Fisheries.  
+### For original development of ecopath for mass-balance equilibria:
+Polovina, J. J. (1984). Model of a coral reef ecosystem. Coral Reefs, 3(1), 1–11. https://doi.org/10.1007/BF00306135
+
+### For development of ecosim for deterministic biomass and age-structured dynamics:
+Christensen, V., & Walters, C. J. (2004). Ecopath with Ecosim: Methods, capabilities and limitations. Ecological Modelling, 172(2), 109–139. https://doi.org/10.1016/j.ecolmodel.2003.09.003
+
+Walters, C., Christensen, V., & Pauly, D. (1997). Structuring dynamic models of exploited ecosystems from trophic mass-balance assessments. Reviews in Fish Biology and Fisheries, 7(2), 139–172. https://doi.org/10.1023/A:1018479526149
+
+Walters, C., Pauly, D., Christensen, V., & Kitchell, J. F. (2000). Representing Density Dependent Consequences of Life History Strategies in Aquatic Ecosystems: EcoSim II. Ecosystems, 3(1), 70–83. https://doi.org/10.1007/s100210000011
+
