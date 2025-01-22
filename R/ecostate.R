@@ -588,14 +588,8 @@ function( taxa,
   # data4 = local({
   #   "c" <- ADoverload("c")
   #   "[<-" <- ADoverload("[<-")
-  #   log_prior <- log_prior
   #   environment()
   # })
-  # if (class(log_prior) == "list") {
-  #   log_prior <- function(p, taxa, years, stanza_groups, sem) {
-  #     evaluate_prior(log_prior, p, taxa, years, stanza_groups, sem)
-  #   }
-  # }
   # environment(log_prior) <- data4
 
   # SEE ?RTMB::MakeADFun examples

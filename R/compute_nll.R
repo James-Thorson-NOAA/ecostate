@@ -474,8 +474,6 @@ function( p,
   }
 
   # Calculate priors
-  #log_prior_value = log_prior( p )
-  #log_prior_value = log_prior(p, taxa, years, settings$unique_stanza_groups, sem)
   log_prior_value = evaluate_prior(log_prior, p, taxa, years, settings$unique_stanza_groups, sem)
 
   # Remove NAs to deal with missing values in Bobs_ti and Cobs_ti
