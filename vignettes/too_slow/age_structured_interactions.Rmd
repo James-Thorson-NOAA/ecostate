@@ -142,7 +142,6 @@ out = ecostate(
     n_steps = n_step,   
     profile = NULL, # Penalized likelihood so use empty set
     random = NULL, # Penalized likelihood so use empty set
-    derived_quantities = c(), # Turn off for speed
     nlminb_loops = 0,
     getsd = FALSE ),
   settings = stanza_settings(
@@ -207,7 +206,6 @@ out = ecostate(
     profile = NULL, # Penalized likelihood so use empty set
     random = NULL, # Penalized likelihood so use empty set
     derived_quantities = c(), # Turn off for speed
-    tmbad.sparse_hessian_compress = 0, # Turn off for speed
     map = map,       # Pass map back in
     tmb_par = tmb_par,  # Pass parameters back in
     trace = 1,
@@ -233,16 +231,11 @@ We can then visualize the estimated food web
 
 ```{r, echo=TRUE, message=FALSE, fig.width=7, fig.height=7}
 library(ggplot2)
-ggplot_foodweb = plot_foodweb( 
+plot_foodweb( 
   out$rep$out_initial$Qe_ij,
   xtracer_i = ifelse(taxa %in% c("Small phytoplankton","Large phytoplankton"),1,0),
   B_i = out$rep$out_initial$B_i,
   type_i = type )
-ggplot_foodweb + 
-  scale_x_continuous( name = "Pelagic proportion" ) +
-  scale_y_continuous( name="Trophic level" ) +
-  ggtitle( "Gulf of Alaska case study") +
-  theme_classic()
 ```
 
 We can also visualize fits to age-composition data.  To do so, we first make a helper function to extract and plot fitted and estimated values
@@ -283,7 +276,7 @@ do_plot(1)
 and for pollock
 
 ```{r, echo=TRUE, message=FALSE, fig.width=7, fig.height=7}
-do_plot(1)
+do_plot(2)
 ```
 
 Fits confirm that the model can track cohorts for age-structured dynamics
