@@ -19,6 +19,8 @@ compute_nll(
   log_prior,
   fit_eps,
   fit_nu,
+  sem,
+  covariates,
   stanza_data,
   settings,
   control,
@@ -50,13 +52,14 @@ compute_nll(
 
 \item{Wobs_ta_g2}{formatted list of weight-at-age data}
 
-\item{log_prior}{A user-provided function that takes as input the list of
+\item{log_prior}{A list of sampling statements representing parameter priors, or a
+user-provided function that takes as input the list of
 parameters \code{out$obj$env$parList()} where \code{out} is the output from
 \code{ecostate()}, and returns a numeric vector
 where the sum is the log-prior probability.  For example
 \code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
 specifies a lognormal prior probability for the catchability coefficient
-for the first \code{taxa} with logmean of zero and logsd of 0.1}
+for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_priors}} for details.}
 
 \item{fit_eps}{Character-vector listing \code{taxa} for which the
 model should estimate annual process errors in dB/dt}

@@ -474,7 +474,9 @@ function( p,
   }
 
   # Calculate priors
-  log_prior_value = log_prior( p )
+  #log_prior_value = log_prior( p )
+  #log_prior_value = log_prior(p, taxa, years, settings$unique_stanza_groups, sem)
+  log_prior_value = evaluate_prior(log_prior, p, taxa, years, settings$unique_stanza_groups, sem)
 
   # Remove NAs to deal with missing values in Bobs_ti and Cobs_ti
   jnll = jnll - ( sum(loglik1_ti) + sum(loglik2_ti) + sum(loglik3_ti) + sum(loglik4_ti) + sum(loglik5_tg2,na.rm=TRUE) + sum(loglik6_tg2) + sum(loglik7_tg2) + loglik8_sem + sum(log_prior_value,na.rm=TRUE) )

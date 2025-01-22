@@ -60,13 +60,14 @@
 #'        a good idea to include a prior for any species for which this is estimated.
 #' @param fit_EE Character-vector listing \code{taxa} for which ecotrophic
 #'        efficiency is estimated.
-#' @param log_prior A user-provided function that takes as input the list of
+#' @param log_prior A list of sampling statements representing parameter priors, or a
+#'        user-provided function that takes as input the list of
 #'        parameters \code{out$obj$env$parList()} where \code{out} is the output from
 #'        \code{ecostate()}, and returns a numeric vector
 #'        where the sum is the log-prior probability.  For example
 #'        \code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
 #'        specifies a lognormal prior probability for the catchability coefficient
-#'        for the first \code{taxa} with logmean of zero and logsd of 0.1
+#'        for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_priors}} for details.
 #' @param control Output from [ecostate_control()], used to define user
 #'        settings.
 #' @param settings Output from [stanza_settings()], used to define age-structured
@@ -584,12 +585,18 @@ function( taxa,
   #environment(add_equilibrium) <- data3
 
   # Load data in environment for function "dBdt"
-  data4 = local({
-                  "c" <- ADoverload("c")
-                  "[<-" <- ADoverload("[<-")
-                  environment()
-  })
-  environment(log_prior) <- data4
+  # data4 = local({
+  #   "c" <- ADoverload("c")
+  #   "[<-" <- ADoverload("[<-")
+  #   log_prior <- log_prior
+  #   environment()
+  # })
+  # if (class(log_prior) == "list") {
+  #   log_prior <- function(p, taxa, years, stanza_groups, sem) {
+  #     evaluate_prior(log_prior, p, taxa, years, stanza_groups, sem)
+  #   }
+  # }
+  # environment(log_prior) <- data4
 
   # SEE ?RTMB::MakeADFun examples
   if( control$integration_method == "ABM"){
