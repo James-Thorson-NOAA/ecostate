@@ -208,7 +208,6 @@ out = ecostate(
     derived_quantities = c(), # Turn off for speed
     map = map,       # Pass map back in
     tmb_par = tmb_par,  # Pass parameters back in
-    trace = 1,
     getsd = FALSE ),
   settings = stanza_settings(
     taxa = taxa,
