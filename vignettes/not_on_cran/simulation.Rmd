@@ -278,8 +278,6 @@ fit_B = taxa       # equilibrium biomass
 # Solving for EE and giving uninformed initial values for biomass
 fittedB_i = sim$Bobs_ti[1,]
 fittedEE_i = rep(NA, n_species)
-
-# Label EwE inputs for each taxon as expected (so users can easily change taxa)
 names(fittedB_i) = names(fittedEE_i) = taxa
 
 # Define priors
