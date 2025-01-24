@@ -49,78 +49,72 @@ evaluate_prior <- function(priors, p, taxa, years, stanza_groups, sem = "") {
     
     logp <- 0
     
+    suppressMessages(attach(p <- set_parnames(p, taxa, stanza_groups, sem)))
+    
     for (i in seq_along(priors)) {
       
-      # Parse formula
-      lhs <- priors[[i]][[2]]
+      # Parse prior density function
       rhs <- priors[[i]][[3]]
       dens <- as.character(rhs[[1]])
       
       # Unpack density arguments
       args <- as.list(formals(dens))
       args <- modifyList(args, as.list(rhs)[-1])
+      args$x <- priors[[i]][[2]]
       args$log <- TRUE
       
-      # Match LHS to SEM parameter names
-      if (class(sem) == "data.frame") {
-        
-        if (as.character(as.list(lhs)[[1]]) %in% sem$name) {
-          
-          args$x <- p$beta[unique(sem$parameter[which(sem$name == as.character(lhs))])]
-          logp <- logp + do.call(dens, args)
-          
-        }
-        
-      }
+      # Evaluate prior density
+      logp_i <- try(sum(do.call(dens, args)), silent = TRUE)
+      if (class(logp_i) == "try-error" | is.na(logp_i)) stop(paste("Problem with prior", deparse(args$x)))
+      logp <- logp + logp_i
+    }
+    
+  }
+  
+  return(logp)
+  
+}
+
+set_parnames <- function(p, taxa, stanza_groups, sem = "") {
+  
+  if (class(sem) == "data.frame") {
+    p$beta <- as.list(setNames(p$beta, as.character(na.omit(sem$name))))
+    p <- append(p[names(p) != "beta"], p$beta)
+  }
+  
+  suffix <- vapply(names(p), \(x) {
+    x <- strsplit(x, split = "_")[[1]]
+    x[length(x)]
+  }, character(1))
+  
+  p_rename <- suffix[suffix %in% c("i", "ti", "g2", "tg2", "ij")]
+  
+  for (i in seq_along(p_rename)) {
+    
+    if (p_rename[i] == "i") {
       
-      # Match indexed parameters
-      if (as.character(as.list(lhs)[[1]]) == "[") {
-        
-        lhs <- as.list(lhs)
-        par_i <- as.character(lhs[[2]])
-        
-        if (!(par_i %in% names(p))) stop(paste0("Parameter name `", par_i, "` not recognized"))  
-        
-        if (grepl("_i", par_i)) {
-          
-          taxa_i <- if (all(as.character(lhs[[3]]) == "")) seq_along(taxa) else do.call("match", list(x = lhs[[3]], table = taxa))
-          args$x <- p[[par_i]][taxa_i]
-          logp <- logp + sum(do.call(dens, args))
-          
-        } else if (grepl("_ti", par_i)) {
-          
-          year_i <- if (all(as.character(lhs[[3]]) == "")) seq_along(years) else do.call("match", list(x = lhs[[3]], table = years))
-          taxa_i <- if (all(as.character(lhs[[4]]) == "")) seq_along(taxa) else do.call("match", list(x = lhs[[4]], table = taxa))
-          args$x <- p[[par_i]][year_i, taxa_i]
-          logp <- logp + sum(do.call(dens, args))
-          
-        } else if (grepl("_g2", par_i)) {
-          
-          sg_i <- if (all(as.character(lhs[[3]]) == "")) seq_along(stanza_groups) else do.call("match", list(x = lhs[[3]], table = stanza_groups))
-          args$x <- p[[par_i]][sg_i]
-          logp <- logp + sum(do.call(dens, args))
-          
-        } else if (grepl("_tg2", par_i)) {
-          
-          year_i <- if (all(as.character(lhs[[3]]) == "")) seq_along(years) else do.call("match", list(x = lhs[[3]], table = years))
-          sg_i <- if (all(as.character(lhs[[4]]) == "")) seq_along(stanza_groups) else do.call("match", list(x = lhs[[4]], table = stanza_groups))
-          args$x <- p[[par_i]][year_i, sg_i]
-          logp <- logp + sum(do.call(dens, args))
-          
-        } else if (grepl("_z", par_i)) {
-          
-          # To implement
-          
-        }
-        
-      }
+      names(p[[names(p_rename)[i]]]) <- taxa
+      
+    } else if (p_rename[i] == "ti") {
+      
+      colnames(p[[names(p_rename)[i]]]) <- taxa
+      
+    } else if (p_rename[i] == "g2" & length(stanza_groups) > 0) {
+      
+      names(p[[names(p_rename)[i]]]) <- stanza_groups
+      
+    } else if (p_rename[i] == "tg2" & length(stanza_groups) > 0) {
+      
+      colnames(p[[names(p_rename)[i]]]) <- stanza_groups
+      
+    } else if (p_rename[i] == "ij") {
+      
+      colnames(p[[names(p_rename)[i]]]) <- rownames(p[[names(p_rename)[i]]]) <- taxa
       
     }
     
   }
   
-  if (is.na(logp)) stop("Problem with specified prior(s)")
-  
-  return(logp)
+  p
   
 }

@@ -97,21 +97,21 @@ fit_X = c("Walleye pollock adult", "Sablefish adult")
 Finally, we define priors using a function that is applied to parameters
 
 ```{r, echo=TRUE, message=FALSE, fig.width=7, fig.height=7}
-log_prior = function(p){
-  lpp = 0
+log_prior = list(
+  
   # Normal(0,0.5) prior on diag(Xprime_ij), where X = exp(Xprime) + 1
-  lpp = lpp + sum(dnorm( diag(p$Xprime_ij), mean=0, sd=0.5, log=TRUE )) 
+  diag(Xprime_ij) ~ dnorm(mean = 0, sd = 0.5),
+  
   # Normal prior on log(q) for adult pollock, matching stock assessment
-  lpp = lpp + dnorm( p$logq_i[match('Walleye pollock adult',taxa)], 
-                     mean=log(0.85), sd=0.1, log=TRUE )
+  logq_i['Walleye pollock adult'] ~ dnorm(mean = log(0.85), sd = 0.1),
+  
   # Tight normal prior on log(PB) for sablefish, matching assessment M value
-  lpp = lpp + dnorm( p$logPB_i['Sablefish adult'], 
-                     mean=log(0.1), sd=0.1, log=TRUE )
+  logPB_i["Sablefish adult"] ~ dnorm(mean = log(0.1), sd = 0.1),
+  
   # Tight normal prior on log(PB) for pollock, matching assessment M value
-  lpp = lpp + dnorm( p$logPB_i['Walleye pollock adult'], 
-                    mean=log(0.3), sd=0.1, log=TRUE )
-  return(lpp)
-}
+  logPB_i['Walleye pollock adult'] ~ dnorm(mean = log(0.3), sd = 0.1)
+  
+)
 ```
 
 ### Building and running the model
@@ -157,7 +157,8 @@ out = ecostate(
     STEPS_PER_YEAR = STEPS_PER_YEAR,
     comp_weight = "multinom",
     Leading = Leading,
-    Wmatslope = Wmatslope )
+    Wmatslope = Wmatslope), 
+  debug = FALSE
 )
 ```
 
@@ -222,7 +223,8 @@ out = ecostate(
     STEPS_PER_YEAR = STEPS_PER_YEAR,
     comp_weight = "multinom",
     Leading = Leading,
-    Wmatslope = Wmatslope )
+    Wmatslope = Wmatslope), 
+  debug = FALSE
 )
 ```
 
