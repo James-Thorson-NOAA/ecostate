@@ -78,7 +78,7 @@ evaluate_prior <- function(priors, p, taxa, years, stanza_groups, sem = "") {
 set_parnames <- function(p, taxa, stanza_groups, sem = "") {
   
   if (class(sem) == "data.frame") {
-    p$beta <- as.list(setNames(p$beta, as.character(na.omit(sem$name))))
+    p$beta <- as.list(setNames(p$beta, unique(as.character(na.omit(sem$name)))))
     p <- append(p[names(p) != "beta"], p$beta)
   }
   

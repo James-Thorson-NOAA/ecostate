@@ -189,10 +189,6 @@ function( taxa,
       control$process_error <- "epsilon"
     }
     
-    if (nrow(covariates) != length(years)) {
-      stop("matrix of SEM covariates must have a row for each year")
-    }
-    
     paths = paste(scan(
       text = sem, 
       what = list(path = "", lag = 1, par = "", start = 1, dump = ""), 
@@ -200,8 +196,21 @@ function( taxa,
       comment.char = "#", fill = TRUE, quiet = TRUE
     )$path, collapse = " ")
     
-    proc_vars <- unique(regmatches(paths, gregexpr("(eps_|nu_|phi_)[^\\s,]+", paths, perl = TRUE))[[1]])
-    sem_vars <- c(colnames(covariates), proc_vars)
+    sem_vars <- proc_vars <- unique(regmatches(paths, gregexpr("(eps_|nu_|phi_)[^\\s,]+", paths, perl = TRUE))[[1]])
+    
+    if (!is.null(covariates)) {
+      
+      if (nrow(covariates) != length(years)) {
+        stop("matrix of SEM covariates must have a row for each year")
+      }
+      
+      if (ncol(covariates) != length(unique(colnames(covariates)))) {
+        stop("Please check `colnames(covariates)` to confirm that all variables (columns) have a unique name")
+      }
+      
+      sem_vars <- c(colnames(covariates), sem_vars)
+       
+    }
     
     sem <- dsem:::read_model(sem, times = years, variables = sem_vars)
     
@@ -222,18 +231,12 @@ function( taxa,
       }
     }
     
-    # Same checks as in dsem::dsem
-    
-    if (any((sem$direction == 2) & (sem[, 2] != 0))) {
+    if (any((sem$direction == 2) & (sem$lag != 0))) {
       stop("All two-headed arrows should have lag=0")
     }
     
     if (!all(c(sem$first, sem$second) %in% sem_vars)) {
       stop("Some variable(s) in `sem` are not in `covariates`, or process errors are not correctly denoted")
-    }
-    
-    if (ncol(covariates) != length(unique(colnames(covariates)))) {
-      stop("Please check `colnames(covariates)` to confirm that all variables (columns) have a unique name")
     }
     
     # Unique parameters to be estimated
@@ -361,7 +364,7 @@ function( taxa,
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
-            beta = if (use_sem) beta else 0,
+            beta = if (use_sem && length(beta) > 0) beta else 0,
             mu = rep(0, ifelse(is.null(covariates), 1, ncol(covariates))),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
             logq_i = rep( log(1), n_species),
@@ -396,13 +399,13 @@ function( taxa,
   # Process error SDs
   if (use_sem) {
     
+    if(!is.null(covariates)) map$mu = factor(seq_along(p$mu)) else map$mu = factor(NA)
+    if(length(beta) > 0) map$beta = factor(seq_along(p$beta)) else map$beta = factor(NA)
+    
     # Map off process error SDs (redundant with SEM SD parameters)
     p$logtau_i = rep(NA, n_species); map$logtau_i = factor(rep(NA, n_species))
     p$logsigma_i = rep(NA, n_species); map$logsigma_i = factor(rep(NA, n_species))
     p$logpsi_g2 = rep(NA, settings$n_g2); map$logpsi_g2 = factor(rep(NA, settings$n_g2))
-    
-    # Map off any fixed SEM parameters
-    map$beta = factor(seq_along(beta))
     
   } else {
     

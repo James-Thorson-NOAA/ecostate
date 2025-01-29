@@ -163,10 +163,12 @@ function( p,
     # Observations for SEM likelihood
     Xit <- matrix(NA, nrow = length(years), ncol = length(variables))
     colnames(Xit) <- variables
-    Xit[,colnames(covariates)] <- covariates
     
     # Subtract covariate means
-    Xit[,colnames(covariates)] <- sweep(Xit[,colnames(covariates), drop = FALSE], 2, p_t$mu)
+    if (!is.null(covariates)) {
+      Xit[,colnames(covariates)] <- covariates
+      Xit[,colnames(covariates)] <- sweep(Xit[,colnames(covariates), drop = FALSE], 2, p_t$mu) 
+    }
     
     # Pull out epsilon, nu values from epsilon_ti and nu_ti matrices
     for (i in seq_len(ncol(Xit))) {
@@ -190,7 +192,10 @@ function( p,
       
       Xit_sim <- matrix(RTMB:::rgmrf0(n = 1, Q = Q), nrow = nrow(Xit), ncol = ncol(Xit), byrow = FALSE)
       colnames(Xit_sim) <- colnames(Xit)
-      Xit_sim[,colnames(covariates)] <- sweep(Xit_sim[,colnames(covariates), drop = FALSE], 2, p_t$mu, FUN = "+")
+      
+      if (!is.null(covariates)) {
+        Xit_sim[,colnames(covariates)] <- sweep(Xit_sim[,colnames(covariates), drop = FALSE], 2, p_t$mu, FUN = "+") 
+      }
       
       for (i in seq_len(ncol(Xit))) {
         if (gsub("eps_", "", colnames(Xit)[i]) %in% taxa) {
