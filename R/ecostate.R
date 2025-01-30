@@ -156,7 +156,7 @@ function( taxa,
           log_prior = function(p) 0,
           settings = stanza_settings(taxa=taxa),
           control = ecostate_control(), 
-          debug = TRUE){
+          debug = 0){
   # importFrom RTMB MakeADFun REPORT ADREPORT sdreport getAll
   # importFrom Matrix Matrix Diagonal sparseMatrix
 
@@ -443,7 +443,7 @@ function( taxa,
     p$epsilon_ti = array(0, dim=c(nrow(Bobs_ti), n_species) )
     map$epsilon_ti = array(seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
     if(any(grepl("eps_", proc_vars))) {
-      map$epsilon_ti[,-na.omit(match(gsub("eps_", "", proc_vars), taxa))[1]] <- NA
+      map$epsilon_ti[,-as.integer(na.omit(match(gsub("eps_", "", proc_vars), taxa)))] <- NA
     } else {
       map$epsilon_ti[,] <- NA
     }
@@ -453,7 +453,7 @@ function( taxa,
     p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
     map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
     if(any(grepl("nu_", proc_vars))) {
-      map$nu_ti[,-na.omit(match(gsub("nu_", "", proc_vars), taxa))[1]] <- NA 
+      map$nu_ti[,-as.integer(na.omit(match(gsub("nu_", "", proc_vars), taxa)))] <- NA 
     } else {
       map$nu_ti[,] <- NA
     }
@@ -463,7 +463,7 @@ function( taxa,
     p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
     map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
     if(any(grepl("phi_", proc_vars))) {
-      map$phi_tg2[,-na.omit(match(gsub("phi_", "", proc_vars), settings$unique_stanza_groups))[1]] <- NA
+      map$phi_tg2[,-as.integer(na.omit(match(gsub("phi_", "", proc_vars), settings$unique_stanza_groups)))] <- NA
     } else {
       map$phi_tg2[,] <- NA
     }
@@ -620,7 +620,7 @@ function( taxa,
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
   #
   
-  if(debug) browser()
+  if(debug == 1) { random = control$random; profile = control$profile; silent = control$silent; browser() }
   
   obj <- MakeADFun( func = cmb( compute_nll,
                                 Bobs_ti = Bobs_ti,
@@ -641,7 +641,8 @@ function( taxa,
                                 #DC_ij = DC_ij,
                                 stanza_data = stanza_data, 
                                 sem = sem,
-                                covariates = covariates),
+                                covariates = covariates, 
+                                debug = debug),
                     parameters = p,
                     map = map,
                     random = control$random,

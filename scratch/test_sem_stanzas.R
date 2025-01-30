@@ -62,7 +62,7 @@ sem = "
   eps_Euphausiids <-> eps_Euphausiids, 0, NA, 1,
   eps_Large.copepods <-> eps_Large.copepods, 0, NA, 1, 
   phi_Walleye.pollock <-> phi_Walleye.pollock, 0, NA, 1,
-  phi_Sablefish <-> phi_Sablefish, 0, sigma, 1
+  phi_Sablefish <-> phi_Sablefish, 0, NA, 1
 "
 
 # Priors
@@ -91,7 +91,9 @@ settings <- stanza_settings(
 control <- ecostate_control( 
   n_steps = n_step,   
   profile = NULL, # Penalized likelihood so use empty set
-  random = NULL # Penalized likelihood so use empty set
+  random = NULL, # Penalized likelihood so use empty set
+  derived_quantities = c(), 
+  getsd = FALSE
 )
 
 out0 <- ecostate(
@@ -99,6 +101,6 @@ out0 <- ecostate(
   catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
   PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
   fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, sem = sem,
-  log_prior = log_prior, settings = settings, # control = control,
-  debug = TRUE
+  log_prior = log_prior, settings = settings, control = control,
+  debug = 0
 )

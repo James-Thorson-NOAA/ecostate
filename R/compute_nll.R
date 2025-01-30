@@ -57,7 +57,8 @@ function( p,
           settings,
           control,
           simulate_data = FALSE,
-          simulate_random = FALSE ) {
+          simulate_random = FALSE, 
+          debug = 0) {
 
   
   # Necessary in packages
@@ -152,6 +153,7 @@ function( p,
   #Y_tzz[1,,] = Y_zz
 
   # Hyperdistribution for random effects
+  if (debug == 2) browser()
   use_sem <- class(sem) == "data.frame"
   if (use_sem) {
     
@@ -239,6 +241,7 @@ function( p,
   }
 
   # Loop through years
+  if (debug == 3) browser()
   for( t in 2:nrow(Bobs_ti) ){
   #for( t in 2:66 ){
     # Assemble inputs
@@ -402,6 +405,7 @@ function( p,
     return(x / sum(x))
   }
   #selex_index = 0
+  if (debug == 4) browser()
   for( index in seq_along(Nobs_ta_g2) ){
     g2 = match( names(Nobs_ta_g2)[index], settings$unique_stanza_groups )
     Xg2_zz = stanza_data$X_zz_g2[[g2]]

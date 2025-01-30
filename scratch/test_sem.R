@@ -1,7 +1,5 @@
 
 library("tidyverse")
-library("checkmate")
-library("Matrix")
 library("dsem")
 library("RTMB")
 library("ecostate")
