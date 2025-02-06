@@ -29,7 +29,8 @@ Imports:
     checkmate,
     ggplot2,
     ggnetwork,
-    igraph
+    igraph, 
+    dsem
 Suggests:
     knitr,
     rmarkdown

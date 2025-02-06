@@ -174,17 +174,17 @@ function( taxa,
 
   # Set up inputs for SEM
   use_sem <- nchar(trimws(sem)) > 0
-  if (use_sem) {
+  if (isTRUE(use_sem)) {
     
     if(!require("dsem")) {
       stop("package `dsem` required for SEM process errors")
     }
     
-    if((length(fit_eps) > 0 | length(fit_nu > 0) | length(settings$fit_phi) > 0)) {
+    if(isTRUE((length(fit_eps) > 0 | length(fit_nu > 0) | length(settings$fit_phi) > 0))) {
       warning("arguments fit_eps, fit_nu, and settings$fit_phi are ignored if using SEM")
     }
     
-    if(control$process_error != "epsilon") {
+    if(isTRUE(control$process_error != "epsilon")) {
       warning("SEM forces innovation ('epsilon') process errors")
       control$process_error <- "epsilon"
     }
@@ -200,11 +200,11 @@ function( taxa,
     
     if (!is.null(covariates)) {
       
-      if (nrow(covariates) != length(years)) {
+      if (isFALSE(nrow(covariates) == length(years))) {
         stop("matrix of SEM covariates must have a row for each year")
       }
       
-      if (ncol(covariates) != length(unique(colnames(covariates)))) {
+      if (isFALSE(ncol(covariates) == length(unique(colnames(covariates))))) {
         stop("Please check `colnames(covariates)` to confirm that all variables (columns) have a unique name")
       }
       
@@ -241,8 +241,9 @@ function( taxa,
     
     # Unique parameters to be estimated
     beta <- unname(c(tapply(sem$start[sem$parameter != 0], sem$parameter[sem$parameter != 0], unique)))
-    if (class(beta) == "list") stop ("Differing starting values provided for SEM parameter(s) with equality constraint")
+    if (isTRUE(class(beta) == "list")) stop ("Differing starting values provided for SEM parameter(s) with equality constraint")
     beta[is.na(beta)] <- 0
+    beta <- setNames(beta, unique(as.character(na.omit(sem$name))))
     
   }
   
@@ -347,7 +348,7 @@ function( taxa,
   n_weight = length(Wobs_ta_g2)
 
   # parameter list
-  p = list( delta_i = rep(log(1), n_species),
+  p = list( delta_i = setNames(rep(log(1), n_species), taxa),
             ln_sdB = log(0.1), 
             ln_sdC = log(0.1),
             logB_i = logB_i,
@@ -357,20 +358,20 @@ function( taxa,
             U_i = U_i,
             Xprime_ij = Xprime_ij,
             DC_ij = DC_ij,
-            logtau_i = rep(NA, n_species),
-            logsigma_i = rep(NA, n_species),
-            logpsi_g2 = rep(NA, settings$n_g2),
+            logtau_i = setNames(rep(NA, n_species), taxa),
+            logsigma_i = setNames(rep(NA, n_species), taxa),
+            logpsi_g2 = setNames(rep(NA, settings$n_g2), settings$unique_stanza_groups),
             epsilon_ti = array( 0, dim=c(0,n_species) ),
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
-            beta = if (use_sem && length(beta) > 0) beta else 0,
-            mu = rep(0, ifelse(is.null(covariates), 1, ncol(covariates))),
+            beta = if (use_sem && length(beta) > 0) beta else numeric(0),
+            mu = if (!is.null(covariates)) setNames(rep(0, ncol(covariates)), colnames(covariates)) else numeric(0),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
-            logq_i = rep( log(1), n_species),
+            logq_i = setNames(rep( log(1), n_species), taxa),
             s50_z = setNames(rep(1, n_selex), names(Nobs_ta_g2)),
             srate_z = setNames(rep(1, n_selex), names(Nobs_ta_g2)),
-            compweight_z = if (n_selex > 0 & settings$comp_weight != "multinom") setNames(rep(1, n_selex)) else numeric(0),
+            compweight_z = if (n_selex > 0 & settings$comp_weight != "multinom") rep(1, n_selex) else numeric(0),
             #selex_z = rep(1, n_selex),  # CHANGE WITH NUMBER OF PARAMETERS
             log_winf_z = setNames(rep(0, n_weight), names(Wobs_ta_g2)),
             ln_sdW_z = setNames(rep(0, n_weight), names(Wobs_ta_g2)),
@@ -380,6 +381,11 @@ function( taxa,
             Wmat_g2 = stanza_data$stanzainfo_g2z[,'Wmat']
   )      # , PB_i=PB_i
 
+  # Set names
+  colnames(p$epsilon_ti) = colnames(p$alpha_ti) = colnames(p$nu_ti) = colnames(p$logF_ti) = taxa
+  colnames(p$phi_tg2) = settings$unique_stanza_groups
+  
+  
   # 
   map = list()
   
@@ -399,8 +405,8 @@ function( taxa,
   # Process error SDs
   if (use_sem) {
     
-    if(!is.null(covariates)) map$mu = factor(seq_along(p$mu)) else map$mu = factor(NA)
-    if(length(beta) > 0) map$beta = factor(seq_along(p$beta)) else map$beta = factor(NA)
+    if(!is.null(covariates)) map$mu = factor(seq_along(p$mu))
+    if(length(beta) > 0) map$beta = factor(seq_along(p$beta))
     
     # Map off process error SDs (redundant with SEM SD parameters)
     p$logtau_i = rep(NA, n_species); map$logtau_i = factor(rep(NA, n_species))
@@ -408,9 +414,6 @@ function( taxa,
     p$logpsi_g2 = rep(NA, settings$n_g2); map$logpsi_g2 = factor(rep(NA, settings$n_g2))
     
   } else {
-    
-    # Map off path coefficients and covariate means
-    map$beta = map$mu = factor(NA)
     
     # Standard deviation of biomass process errors
     p$logtau_i = ifelse(taxa %in% fit_eps, log(control$start_tau), NA)

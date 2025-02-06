@@ -14,10 +14,6 @@
 #'        for the first \code{taxa} with logmean of zero and logsd of 0.1
 #'  }
 #' @param p List of parameters
-#' @param taxa Character vector of taxa included in mode
-#' @param years Integer-vector of years included in model
-#' @param stanza_groups Character vector of unique multi-stanza groups
-#' @param sem SEM model data frame
 #'
 #' @return Log-prior density (numeric)
 #' @export
@@ -36,10 +32,18 @@
 #'  )
 #' }
 #' 
-evaluate_prior <- function(priors, p, taxa, years, stanza_groups, sem = "") {
+evaluate_prior <- function(priors, p) {
   
   "c" <- ADoverload("c")
   "[<-" <- ADoverload("[<-")
+  
+  if (length(p$beta) > 0) { 
+    for (i in seq_along(p$beta)) {
+      if (isTRUE(names(p$beta[i]) %in% names(p))) stop(paste("Parameter name", names(p$beta[i]), "is reserved"))
+      p[[names(p$beta[i])]] <- p$beta[i]
+    }
+    p <- p[names(p) != "beta"]
+  }
   
   if (class(priors) == "function") {
     
@@ -49,7 +53,7 @@ evaluate_prior <- function(priors, p, taxa, years, stanza_groups, sem = "") {
     
     logp <- 0
     
-    suppressMessages(attach(p <- set_parnames(p, taxa, stanza_groups, sem)))
+    suppressMessages(attach(p))
     
     for (i in seq_along(priors)) {
       
@@ -72,49 +76,5 @@ evaluate_prior <- function(priors, p, taxa, years, stanza_groups, sem = "") {
   }
   
   return(logp)
-  
-}
-
-set_parnames <- function(p, taxa, stanza_groups, sem = "") {
-  
-  if (class(sem) == "data.frame") {
-    p$beta <- as.list(setNames(p$beta, unique(as.character(na.omit(sem$name)))))
-    p <- append(p[names(p) != "beta"], p$beta)
-  }
-  
-  suffix <- vapply(names(p), \(x) {
-    x <- strsplit(x, split = "_")[[1]]
-    x[length(x)]
-  }, character(1))
-  
-  p_rename <- suffix[suffix %in% c("i", "ti", "g2", "tg2", "ij")]
-  
-  for (i in seq_along(p_rename)) {
-    
-    if (p_rename[i] == "i") {
-      
-      names(p[[names(p_rename)[i]]]) <- taxa
-      
-    } else if (p_rename[i] == "ti") {
-      
-      colnames(p[[names(p_rename)[i]]]) <- taxa
-      
-    } else if (p_rename[i] == "g2" & length(stanza_groups) > 0) {
-      
-      names(p[[names(p_rename)[i]]]) <- stanza_groups
-      
-    } else if (p_rename[i] == "tg2" & length(stanza_groups) > 0) {
-      
-      colnames(p[[names(p_rename)[i]]]) <- stanza_groups
-      
-    } else if (p_rename[i] == "ij") {
-      
-      colnames(p[[names(p_rename)[i]]]) <- rownames(p[[names(p_rename)[i]]]) <- taxa
-      
-    }
-    
-  }
-  
-  p
   
 }
