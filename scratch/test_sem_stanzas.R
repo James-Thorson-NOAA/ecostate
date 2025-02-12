@@ -105,8 +105,7 @@ dgmrf_fit <- ecostate(
   catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
   PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
   fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, sem = sem,
-  log_prior = log_prior, settings = settings_dgmrf, control = control,
-  debug = 0
+  log_prior = log_prior, settings = settings_dgmrf, control = control
 )
 
 # Non-SEM ML implementation -------------------------------
@@ -129,8 +128,7 @@ dnorm_fit <- ecostate(
   catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
   PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
   fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, fit_eps = fit_eps,
-  log_prior = log_prior, settings = settings_dnorm, control = control,
-  debug = 0
+  log_prior = log_prior, settings = settings_dnorm, control = control
 )
 
 # Fixed run -----------------------------------------------
@@ -148,10 +146,8 @@ dgmrf_penalized <- ecostate(
   catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
   PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
   fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, sem = sem,
-  log_prior = log_prior, settings = settings_dgmrf, control = control,
-  debug = 0
+  log_prior = log_prior, settings = settings_dgmrf, control = control
 )
-
 
 # Fixed run, non-SEM implementation -----------------------
 
@@ -162,8 +158,7 @@ dnorm_penalized0 <- ecostate(
   catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
   PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
   fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, fit_eps = fit_eps,
-  log_prior = log_prior, settings = settings_dnorm, control = control,
-  debug = 0
+  log_prior = log_prior, settings = settings_dnorm, control = control
 )
 
 map <- dnorm_penalized0$tmb_inputs$map
@@ -177,20 +172,33 @@ tmb_par$logtau_i = ifelse( is.na(tmb_par$logtau_i), NA, log(1) )
 map$logpsi_g2 = factor(rep(NA,length(map$logpsi_g2)))
 tmb_par$logpsi_g2 = ifelse( is.na(tmb_par$logpsi_g2), NA, log(1) ) 
 
-control$nlminb_loops <- 1
-control$map <- map
-control$tmb_par <- tmb_par
+pcontrol <- control
+pcontrol$nlminb_loops <- 1
+pcontrol$map <- map
+pcontrol$tmb_par <- tmb_par
 
 dnorm_penalized <- ecostate(
   taxa = taxa, years = years, type = type,
   catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
   PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
   fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, fit_eps = fit_eps,
-  log_prior = log_prior, settings = settings_dnorm, control = control,
-  debug = 0
+  log_prior = log_prior, settings = settings_dnorm, control = pcontrol
 )
 
 # Comparison ----------------------------------------------
+
+## Likelihood, same parameters ----------------------------
+
+dgmrf_par <- dgmrf_fit$opt$par
+dgmrf_par[which(names(dgmrf_par) == "beta")] <- 1
+
+dnorm_par <- dnorm_fit$opt$par
+dnorm_par[!(names(dnorm_par) %in% c("logtau_i", "logpsi_g2"))] <- dgmrf_par[names(dgmrf_par) != "beta"]
+dnorm_par[names(dnorm_par) %in% c("logtau_i", "logpsi_g2")] <- log(1)
+
+cor(dgmrf_par[!(names(dgmrf_par) == "beta")], dnorm_par[!(names(dnorm_par) %in% c("logtau_i", "logpsi_g2"))])
+
+dgmrf_fit$obj$fn(dgmrf_par) == dnorm_fit$obj$fn(dnorm_par)
 
 ## Penalized models ---------------------------------------
 
@@ -229,3 +237,36 @@ saveRDS(dgmrf_fit, paste0(savedir, "dgmrf_fit.rds"))
 saveRDS(dnorm_fit, paste0(savedir, "dnorm_fit.rds"))
 saveRDS(dgmrf_penalized, paste0(savedir, "dgmrf_penalized.rds"))
 saveRDS(dnorm_penalized, paste0(savedir, "dnorm_penalized.rds"))
+
+# Fit penalized model with cold pool effect ---------------
+
+# devtools::install_github("afsc-gap-products/akgfmaps", build_vignettes = TRUE)
+# devtools::install_github("afsc-gap-products/coldpool")
+library("coldpool")
+
+sem = "
+  eps_Euphausiids <-> eps_Euphausiids, 0, NA, 1,
+  eps_Large.copepods <-> eps_Large.copepods, 0, NA, 1, 
+  phi_Walleye.pollock <-> phi_Walleye.pollock, 0, NA, 1,
+  phi_Sablefish <-> phi_Sablefish, 0, NA, 1, 
+  cold_pool -> phi_Walleye.pollock, 0, beta_cp_plk, 0
+"
+
+covariates <- matrix(NA, nrow = length(years), ncol = 1)
+colnames(covariates) <- "cold_pool"
+covariates[match(cold_pool_index$YEAR, years)] <- cold_pool_index$AREA_LTE2_KM2 / 496360
+
+cold_pool_ctrl <- ecostate_control(
+  n_steps = n_step, profile = NULL, random = c("covariates"), getsd = TRUE, 
+  silent = FALSE, verbose = TRUE, trace = TRUE
+)
+
+cold_pool_fit <- ecostate(
+  taxa = taxa, years = years, type = type,
+  catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
+  PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
+  fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, sem = sem, covariates = covariates,
+  log_prior = log_prior, settings = settings_dgmrf, control = cold_pool_ctrl
+)
+
+plot()

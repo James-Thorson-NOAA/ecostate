@@ -50,7 +50,7 @@ fit_eps <- "Pollock"
 sem <- "
   cold_pool -> eps_Pollock, 1, beta_cp_plk, 0,
   eps_Pollock -> eps_Pollock, 1, rho_plk, 0,
-  cold_pool <-> cold_pool, 0, sigma_cp, 0.1
+  cold_pool <-> cold_pool, 0, sigma_cp, 0.1,
   eps_Pollock <-> eps_Pollock, 0, sigma_plk, 0.5
 "
 
@@ -72,7 +72,7 @@ fit_nu <- vector()
 fit_PB <- vector()
 fit_QB <- vector()
 settings <- stanza_settings(taxa=taxa)
-control <- ecostate_control(n_steps = 20, start_tau = 0.01, tmbad.sparse_hessian_compress = 0)
+control <- ecostate_control(n_steps = 20, tmbad.sparse_hessian_compress = 0)
 
 # Initial run (to return simulate()) ----------------------
 
@@ -83,11 +83,10 @@ out0 <- ecostate(
   type = type, U = U, fit_Q = fit_Q, fit_B0 = fit_B0, fit_B = fit_B, fit_EE = fit_EE,
   sem = sem, covariates = covariates,
   settings = settings, control = control, 
-  log_prior = list(
-    rho_plk ~ dnorm(mean = 0, sd = 0.25),
-    sigma_plk ~ dlnorm(meanlog = -2, sdlog = 0.5)
-  ),
-  debug = FALSE
+  # log_prior = list(
+  #   rho_plk ~ dnorm(mean = 0, sd = 0.25),
+  #   sigma_plk ~ dlnorm(meanlog = -2, sdlog = 0.5)
+  # )
 )
 
 # Simulation testing --------------------------------------

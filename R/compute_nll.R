@@ -52,13 +52,11 @@ function( p,
           fit_eps,
           fit_nu,
           sem, 
-          covariates,
           stanza_data,
           settings,
           control,
           simulate_data = FALSE,
-          simulate_random = FALSE, 
-          debug = 0) {
+          simulate_random = FALSE) {
 
   
   # Necessary in packages
@@ -153,7 +151,6 @@ function( p,
   #Y_tzz[1,,] = Y_zz
 
   # Hyperdistribution for random effects
-  if (debug == 2) browser()
   use_sem <- class(sem) == "data.frame"
   if (use_sem) {
     
@@ -167,9 +164,9 @@ function( p,
     colnames(Xit) <- variables
     
     # Subtract covariate means
-    if (!is.null(covariates)) {
-      Xit[,colnames(covariates)] <- covariates
-      Xit[,colnames(covariates)] <- sweep(Xit[,colnames(covariates), drop = FALSE], 2, p_t$mu) 
+    if (!is.null(p$covariates)) {
+      Xit[,colnames(p$covariates)] <- p$covariates
+      Xit[,colnames(p$covariates)] <- sweep(Xit[,colnames(p$covariates), drop = FALSE], 2, p_t$mu) 
     }
     
     # Pull out epsilon, nu values from epsilon_ti and nu_ti matrices
@@ -195,8 +192,8 @@ function( p,
       Xit_sim <- matrix(RTMB:::rgmrf0(n = 1, Q = Q), nrow = nrow(Xit), ncol = ncol(Xit), byrow = FALSE)
       colnames(Xit_sim) <- colnames(Xit)
       
-      if (!is.null(covariates)) {
-        Xit_sim[,colnames(covariates)] <- sweep(Xit_sim[,colnames(covariates), drop = FALSE], 2, p_t$mu, FUN = "+") 
+      if (!is.null(p$covariates)) {
+        Xit_sim[,colnames(p$covariates)] <- sweep(Xit_sim[,colnames(p$covariates), drop = FALSE], 2, p_t$mu, FUN = "+") 
       }
       
       for (i in seq_len(ncol(Xit))) {
@@ -206,8 +203,8 @@ function( p,
           p$nu_ti[, which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
         } else if (gsub("phi_", "", colnames(Xit)[i]) %in% settings$unique_stanza_groups) {
           p$phi_tg2[, which(settings$unique_stanza_groups %in% gsub("phi_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
-        } else if (colnames(Xit)[i] %in% colnames(covariates)) {
-          covariates[,which(colnames(covariates) == colnames(Xit)[i])] <- Xit_sim[,i]
+        } else if (colnames(Xit)[i] %in% colnames(p$covariates)) {
+          p$covariates[,which(colnames(p$covariates) == colnames(Xit)[i])] <- Xit_sim[,i]
         }
       }
       
@@ -241,7 +238,6 @@ function( p,
   }
 
   # Loop through years
-  if (debug == 3) browser()
   for( t in 2:nrow(Bobs_ti) ){
   #for( t in 2:66 ){
     # Assemble inputs
@@ -405,7 +401,6 @@ function( p,
     return(x / sum(x))
   }
   #selex_index = 0
-  if (debug == 4) browser()
   for( index in seq_along(Nobs_ta_g2) ){
     g2 = match( names(Nobs_ta_g2)[index], settings$unique_stanza_groups )
     Xg2_zz = stanza_data$X_zz_g2[[g2]]
@@ -622,7 +617,7 @@ function( p,
                 Bexp_ti = Bexp_ti,
                 Nobs_ta_g2 = Nobs_ta_g2,
                 Wobs_ta_g2 = Wobs_ta_g2, 
-                covariates = covariates)
+                covariates = p$covariates)
   }else{
     out = jnll
   }

@@ -155,8 +155,7 @@ function( taxa,
           covariates = NULL,
           log_prior = function(p) 0,
           settings = stanza_settings(taxa=taxa),
-          control = ecostate_control(), 
-          debug = 0){
+          control = ecostate_control()){
   # importFrom RTMB MakeADFun REPORT ADREPORT sdreport getAll
   # importFrom Matrix Matrix Diagonal sparseMatrix
 
@@ -242,7 +241,7 @@ function( taxa,
     # Unique parameters to be estimated
     beta <- unname(c(tapply(sem$start[sem$parameter != 0], sem$parameter[sem$parameter != 0], unique)))
     if (isTRUE(class(beta) == "list")) stop ("Differing starting values provided for SEM parameter(s) with equality constraint")
-    beta[is.na(beta)] <- 0
+    beta[is.na(beta)] <- sem$start[is.na(sem$start)] <- 0.1
     beta <- setNames(beta, unique(as.character(na.omit(sem$name))))
     
   }
@@ -472,6 +471,14 @@ function( taxa,
     }
     map$phi_tg2 = factor(map$phi_tg2)
     
+    # Covariates
+    # Treat as fixed unless there are NAs, in which case, estimate missing values
+    if (!is.null(covariates)) {
+      p$covariates <- as.matrix(covariates)
+      p$covariates[is.na(p$covariates)] <- 0
+      map$covariates <- factor(c(ifelse(!is.na(covariates), NA, seq_along(covariates))))
+    }
+    
   } else {
     
     if( control$process_error == "epsilon" ){
@@ -623,8 +630,6 @@ function( taxa,
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
   #
   
-  if(debug == 1) { random = control$random; profile = control$profile; silent = control$silent; browser() }
-  
   obj <- MakeADFun( func = cmb( compute_nll,
                                 Bobs_ti = Bobs_ti,
                                 Cobs_ti = Cobs_ti,
@@ -643,9 +648,7 @@ function( taxa,
                                 log_prior = log_prior,
                                 #DC_ij = DC_ij,
                                 stanza_data = stanza_data, 
-                                sem = sem,
-                                covariates = covariates, 
-                                debug = debug),
+                                sem = sem),
                     parameters = p,
                     map = map,
                     random = control$random,
@@ -716,7 +719,6 @@ function( taxa,
                 fit_eps = fit_eps,
                 fit_nu = fit_nu,
                 sem, 
-                covariates,
                 settings = settings,
                 log_prior = log_prior,
                 stanza_data = stanza_data,
@@ -906,7 +908,7 @@ function( nlminb_loops = 1,
           trace = getOption("ecostate.trace", 0),
           verbose = getOption("ecostate.verbose", FALSE),
           profile = c("logF_ti","log_winf_z","s50_z","srate_z"),
-          random = c("epsilon_ti","alpha_ti","nu_ti","phi_tg2"),
+          random = c("epsilon_ti","alpha_ti","nu_ti","phi_tg2","covariates"),
           tmb_par = NULL,
           map = NULL,
           getJointPrecision = FALSE,
