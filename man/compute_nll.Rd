@@ -20,7 +20,6 @@ compute_nll(
   fit_eps,
   fit_nu,
   sem,
-  covariates,
   stanza_data,
   settings,
   control,
@@ -59,7 +58,7 @@ parameters \code{out$obj$env$parList()} where \code{out} is the output from
 where the sum is the log-prior probability.  For example
 \code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
 specifies a lognormal prior probability for the catchability coefficient
-for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_priors}} for details.}
+for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_prior}} for details.}
 
 \item{fit_eps}{Character-vector listing \code{taxa} for which the
 model should estimate annual process errors in dB/dt}
@@ -76,9 +75,6 @@ where 1 indicates a lagged effect, \code{rho_i} is a user-provided parameter nam
 0 is a starting value. See \code{\link[dsem]{make_dsem_ram}} for an introduction to DSEM
 path notation.
 \code{\link[dsem]{make_dsem_ram}} for introduction to DSEM path notation.}
-
-\item{covariates}{Matrix of covariates (with one row per year) for use in dynamic
-structural equation model on process errors.}
 
 \item{stanza_data}{output from \code{make_stanza_data}}
 

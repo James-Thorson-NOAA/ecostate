@@ -238,35 +238,49 @@ saveRDS(dnorm_fit, paste0(savedir, "dnorm_fit.rds"))
 saveRDS(dgmrf_penalized, paste0(savedir, "dgmrf_penalized.rds"))
 saveRDS(dnorm_penalized, paste0(savedir, "dnorm_penalized.rds"))
 
-# Fit penalized model with cold pool effect ---------------
+# Fit penalized model with temperature effect ---------------
 
-# devtools::install_github("afsc-gap-products/akgfmaps", build_vignettes = TRUE)
-# devtools::install_github("afsc-gap-products/coldpool")
-library("coldpool")
+## SST summarized from monthly time series https://shinyfin.psmfc.org/ak-sst-mhw/
+goa_sst <- structure(list(
+  year = c(
+    1985, 1986, 1987, 1988, 1989, 1990, 1991, 
+    1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 
+    2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 
+    2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024
+  ), 
+  sst = c(
+    7.232, 7.699, 7.997, 7.661, 7.571, 7.742, 7.356, 7.625, 
+    8.056, 7.685, 7.595, 7.665, 8.284, 8.174, 7.323, 7.733, 7.985, 
+    7.862, 8.605, 8.369, 8.577, 7.738, 7.437, 7.105, 7.416, 7.819, 
+    7.534, 7.05, 7.821, 8.529, 8.793, 9.291, 8.328, 8.411, 9.033, 
+    8.299, 7.901, 8.074, 7.886, 8.043
+  )), 
+  row.names = c(NA, -40L), class = "data.frame"
+)
 
 sem = "
   eps_Euphausiids <-> eps_Euphausiids, 0, NA, 1,
   eps_Large.copepods <-> eps_Large.copepods, 0, NA, 1, 
   phi_Walleye.pollock <-> phi_Walleye.pollock, 0, NA, 1,
   phi_Sablefish <-> phi_Sablefish, 0, NA, 1, 
-  cold_pool -> phi_Walleye.pollock, 0, beta_cp_plk, 0
+  sst -> phi_Walleye.pollock, 0, beta_sst_plk, 0
 "
 
 covariates <- matrix(NA, nrow = length(years), ncol = 1)
-colnames(covariates) <- "cold_pool"
-covariates[match(cold_pool_index$YEAR, years)] <- cold_pool_index$AREA_LTE2_KM2 / 496360
+colnames(covariates) <- "sst"
+covariates[match(goa_sst$year, years)] <- goa_sst$sst
 
-cold_pool_ctrl <- ecostate_control(
+sst_ctrl <- ecostate_control(
   n_steps = n_step, profile = NULL, random = c("covariates"), getsd = TRUE, 
   silent = FALSE, verbose = TRUE, trace = TRUE
 )
 
-cold_pool_fit <- ecostate(
+sst_fit <- ecostate(
   taxa = taxa, years = years, type = type,
   catch = catch_data, biomass = biomass_data, agecomp = agecomp_data,
   PB = P_over_B, QB = Q_over_B, DC = Diet_proportions, B = B, EE = EE, X = X, U = U,
   fit_B = fit_B, fit_Q = fit_Q, fit_PB = fit_PB, sem = sem, covariates = covariates,
-  log_prior = log_prior, settings = settings_dgmrf, control = cold_pool_ctrl
+  log_prior = log_prior, settings = settings_dgmrf, control = sst_ctrl
 )
 
 plot()

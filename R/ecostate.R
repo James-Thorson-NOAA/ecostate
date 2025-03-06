@@ -78,7 +78,7 @@
 #'        where the sum is the log-prior probability.  For example
 #'        \code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
 #'        specifies a lognormal prior probability for the catchability coefficient
-#'        for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_priors}} for details.
+#'        for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_prior}} for details.
 #' @param control Output from [ecostate_control()], used to define user
 #'        settings.
 #' @param settings Output from [stanza_settings()], used to define age-structured
@@ -366,6 +366,7 @@ function( taxa,
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
             beta = if (use_sem && length(beta) > 0) beta else numeric(0),
             mu = if (!is.null(covariates)) setNames(rep(0, ncol(covariates)), colnames(covariates)) else numeric(0),
+            covariates = numeric(0),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
             logq_i = setNames(rep( log(1), n_species), taxa),
             s50_z = setNames(rep(1, n_selex), names(Nobs_ta_g2)),
@@ -379,11 +380,6 @@ function( taxa,
             logit_d_g2 = qlogis(stanza_data$stanzainfo_g2z[,'d']),
             Wmat_g2 = stanza_data$stanzainfo_g2z[,'Wmat']
   )      # , PB_i=PB_i
-
-  # Set names
-  colnames(p$epsilon_ti) = colnames(p$alpha_ti) = colnames(p$nu_ti) = colnames(p$logF_ti) = taxa
-  colnames(p$phi_tg2) = settings$unique_stanza_groups
-  
   
   # 
   map = list()
@@ -415,15 +411,15 @@ function( taxa,
   } else {
     
     # Standard deviation of biomass process errors
-    p$logtau_i = ifelse(taxa %in% fit_eps, log(control$start_tau), NA)
+    p$logtau_i = setNames(ifelse(taxa %in% fit_eps, log(control$start_tau), NA), taxa)
     map$logtau_i = factor(ifelse(taxa %in% fit_eps, seq_len(n_species), NA))
     
     # Standard deviation of consumption process errors
-    p$logsigma_i = ifelse(taxa %in% fit_nu, log(control$start_tau), NA)
+    p$logsigma_i = setNames(ifelse(taxa %in% fit_nu, log(control$start_tau), NA), taxa)
     map$logsigma_i = factor(ifelse(taxa %in% fit_nu, seq_len(n_species), NA))
     
     # Standard deviation of recruitment process errors
-    p$logpsi_g2 = ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA)
+    p$logpsi_g2 = setNames(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA), settings$unique_stanza_groups)
     map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, seq_len(settings$n_g2), NA))
     
   }
@@ -525,6 +521,9 @@ function( taxa,
     
   }
   
+  # Set names
+  colnames(p$epsilon_ti) = colnames(p$alpha_ti) = colnames(p$nu_ti) = colnames(p$logF_ti) = taxa
+  colnames(p$phi_tg2) = settings$unique_stanza_groups
 
   # Measurement errors
   p$ln_sdB = log(0.1)
@@ -628,7 +627,6 @@ function( taxa,
   #}
   #cmb <- function(f, d) function(p) f(p, d) ## Helper to make closure
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
-  #
   
   obj <- MakeADFun( func = cmb( compute_nll,
                                 Bobs_ti = Bobs_ti,

@@ -164,7 +164,7 @@ function( p,
     colnames(Xit) <- variables
     
     # Subtract covariate means
-    if (!is.null(p$covariates)) {
+    if (!is.null(dim(p$covariates))) {
       Xit[,colnames(p$covariates)] <- p$covariates
       Xit[,colnames(p$covariates)] <- sweep(Xit[,colnames(p$covariates), drop = FALSE], 2, p_t$mu) 
     }

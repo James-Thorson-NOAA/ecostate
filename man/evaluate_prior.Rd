@@ -4,7 +4,7 @@
 \alias{evaluate_prior}
 \title{EcoState priors}
 \usage{
-evaluate_prior(priors, p, taxa, years, stanza_groups, sem = "")
+evaluate_prior(priors, p)
 }
 \arguments{
 \item{priors}{Either:
@@ -21,14 +21,6 @@ for the first \code{taxa} with logmean of zero and logsd of 0.1
 }}
 
 \item{p}{List of parameters}
-
-\item{taxa}{Character vector of taxa included in mode}
-
-\item{years}{Integer-vector of years included in model}
-
-\item{stanza_groups}{Character vector of unique multi-stanza groups}
-
-\item{sem}{SEM model data frame}
 }
 \value{
 Log-prior density (numeric)
