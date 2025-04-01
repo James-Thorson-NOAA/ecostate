@@ -1,9 +1,7 @@
 
 parse_ecostate_sem <- function(sem, covariates, taxa, years, fit_eps, fit_nu, settings, control) {
-  
-  if(!require("dsem")) {
-    stop("package `dsem` required for SEM process errors")
-  }
+
+  read_model <- utils::getFromNamespace("read_model", "dsem")
   
   if(isTRUE((length(fit_eps) > 0 | length(fit_nu > 0) | length(settings$fit_phi) > 0))) {
     warning("arguments fit_eps, fit_nu, and settings$fit_phi are ignored if using SEM")
@@ -37,7 +35,7 @@ parse_ecostate_sem <- function(sem, covariates, taxa, years, fit_eps, fit_nu, se
     
   }
   
-  sem <- dsem:::read_model(sem, times = years, variables = sem_vars)
+  sem <- read_model(sem, times = years, variables = sem_vars)
   
   if (any(grepl(" ", taxa))) {
     stop("If using SEM, taxa (and stanza) names must not have spaces")

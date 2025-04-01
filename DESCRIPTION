@@ -30,7 +30,8 @@ Imports:
     ggplot2,
     ggnetwork,
     igraph, 
-    dsem
+    dsem, 
+    utils
 Suggests:
     knitr,
     rmarkdown, 
