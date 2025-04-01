@@ -154,10 +154,12 @@ function( p,
   use_sem <- class(sem) == "data.frame"
   if (use_sem) {
     
+    rgmrf0 <- getFromNamespace("rgmrf0", "RTMB")
+    
     # SEM precision matrix
     variables <- unique(c(sem$first, sem$second))
-    sem_mat <- dsem:::make_matrices(p_t$beta, sem, years, variables)
-    Q <- Matrix::t(sem_mat$IminusP_kk) %*% sem_mat$invV_kk %*% sem_mat$IminusP_kk
+    sem_mat <- make_matrices(p_t$beta, sem, years, variables)
+    Q <- t(sem_mat$IminusP_kk) %*% sem_mat$invV_kk %*% sem_mat$IminusP_kk
     
     # Observations for SEM likelihood
     Xit <- matrix(NA, nrow = length(years), ncol = length(variables))
@@ -189,7 +191,7 @@ function( p,
     
     if (isTRUE(simulate_data) & isTRUE(simulate_random)) {
       
-      Xit_sim <- matrix(RTMB:::rgmrf0(n = 1, Q = Q), nrow = nrow(Xit), ncol = ncol(Xit), byrow = FALSE)
+      Xit_sim <- matrix(rgmrf0(n = 1, Q = Q), nrow = nrow(Xit), ncol = ncol(Xit), byrow = FALSE)
       colnames(Xit_sim) <- colnames(Xit)
       
       if (!is.null(p$covariates)) {

@@ -26,14 +26,17 @@ Depends:
 Imports:
     TMB,
     MASS,
+    Matrix,
     checkmate,
     ggplot2,
     ggnetwork,
     igraph, 
-    dsem
+    dsem, 
+    utils
 Suggests:
     knitr,
-    rmarkdown
+    rmarkdown, 
+    testthat
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 VignetteBuilder: knitr

@@ -45,15 +45,13 @@ evaluate_prior <- function(priors, p) {
     p <- p[names(p) != "beta"]
   }
   
-  if (class(priors) == "function") {
+  if (inherits(priors, "function")) {
     
     logp <- priors(p)
     
-  } else if (class(priors) == "list") {
+  } else if (inherits(priors, "list")) {
     
     logp <- 0
-    
-    suppressMessages(attach(p))
     
     for (i in seq_along(priors)) {
       
@@ -68,8 +66,8 @@ evaluate_prior <- function(priors, p) {
       args$log <- TRUE
       
       # Evaluate prior density
-      logp_i <- try(sum(do.call(dens, args)), silent = TRUE)
-      if (class(logp_i) == "try-error" | is.na(logp_i)) stop(paste("Problem with prior", deparse(args$x)))
+      logp_i <- try(with(p, sum(do.call(dens, args))), silent = TRUE)
+      if (inherits(logp_i, "try-error") | is.na(logp_i)) stop(paste("Problem with prior", deparse(args$x)))
       logp <- logp + logp_i
     }
     
