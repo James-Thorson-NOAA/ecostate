@@ -41,3 +41,7 @@ importFrom(utils,relist)
 
 # Edited by hand
 import("RTMB")
+importFrom("stats", "na.omit", "setNames")
+importFrom("utils", "getFromNamespace", "modifyList")
+importFrom("dsem", "make_matrices")
+importFrom("Matrix", "t")

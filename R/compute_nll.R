@@ -154,7 +154,6 @@ function( p,
   use_sem <- class(sem) == "data.frame"
   if (use_sem) {
     
-    make_matrices <- getFromNamespace("make_matrices", "dsem")
     rgmrf0 <- getFromNamespace("rgmrf0", "RTMB")
     
     # SEM precision matrix
