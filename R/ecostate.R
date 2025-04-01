@@ -174,76 +174,12 @@ function( taxa,
   # Set up inputs for SEM
   use_sem <- nchar(trimws(sem)) > 0
   if (isTRUE(use_sem)) {
-    
-    if(!require("dsem")) {
-      stop("package `dsem` required for SEM process errors")
-    }
-    
-    if(isTRUE((length(fit_eps) > 0 | length(fit_nu > 0) | length(settings$fit_phi) > 0))) {
-      warning("arguments fit_eps, fit_nu, and settings$fit_phi are ignored if using SEM")
-    }
-    
-    if(isTRUE(control$process_error != "epsilon")) {
-      warning("SEM forces innovation ('epsilon') process errors")
-      control$process_error <- "epsilon"
-    }
-    
-    paths = paste(scan(
-      text = sem, 
-      what = list(path = "", lag = 1, par = "", start = 1, dump = ""), 
-      sep = ",", strip.white = TRUE, 
-      comment.char = "#", fill = TRUE, quiet = TRUE
-    )$path, collapse = " ")
-    
-    sem_vars <- proc_vars <- unique(regmatches(paths, gregexpr("(eps_|nu_|phi_)[^\\s,]+", paths, perl = TRUE))[[1]])
-    
-    if (!is.null(covariates)) {
-      
-      if (isFALSE(nrow(covariates) == length(years))) {
-        stop("matrix of SEM covariates must have a row for each year")
-      }
-      
-      if (isFALSE(ncol(covariates) == length(unique(colnames(covariates))))) {
-        stop("Please check `colnames(covariates)` to confirm that all variables (columns) have a unique name")
-      }
-      
-      sem_vars <- c(colnames(covariates), sem_vars)
-       
-    }
-    
-    sem <- dsem:::read_model(sem, times = years, variables = sem_vars)
-    
-    if (any(grepl(" ", taxa))) {
-      stop("If using SEM, taxa (and stanza) names must not have spaces")
-    }
-    
-    if (length(settings$stanza_groups) > 0) {
-      if (any(grepl(" ", settings$unique_stanza_groups))) {
-        stop("If using SEM, taxa (and stanza) names must not have spaces")
-      }
-      for (i in seq_along(proc_vars)) {
-        if (gsub("eps_|nu_", "", proc_vars[i]) %in% settings$unique_stanza_groups) {
-          if (!(gsub("eps_|nu_", "", proc_vars[i]) %in% taxa)) {
-            stop("epsilon and nu process errors must be specified for taxa, not stanza groups")
-          }
-        }
-      }
-    }
-    
-    if (any((sem$direction == 2) & (sem$lag != 0))) {
-      stop("All two-headed arrows should have lag=0")
-    }
-    
-    if (!all(c(sem$first, sem$second) %in% sem_vars)) {
-      stop("Some variable(s) in `sem` are not in `covariates`, or process errors are not correctly denoted")
-    }
-    
-    # Unique parameters to be estimated
-    beta <- unname(c(tapply(sem$start[sem$parameter != 0], sem$parameter[sem$parameter != 0], unique)))
-    if (isTRUE(class(beta) == "list")) stop ("Differing starting values provided for SEM parameter(s) with equality constraint")
-    beta[is.na(beta)] <- sem$start[is.na(sem$start)] <- 0.1
-    beta <- setNames(beta, unique(as.character(na.omit(sem$name))))
-    
+    sem_settings <- parse_ecostate_sem(
+      sem = sem, covariates = covariates, taxa = taxa, years = years, fit_eps = fit_eps, fit_nu = fit_nu, 
+      settings = settings, control = control
+    )
+  } else {
+    sem_settings <- list(model = sem)
   }
   
   # Set tmbad.sparse_hessian_compress
@@ -364,7 +300,7 @@ function( taxa,
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
-            beta = if (use_sem && length(beta) > 0) beta else numeric(0),
+            beta = if (use_sem && length(sem_settings$beta) > 0) sem_settings$beta else numeric(0),
             mu = if (!is.null(covariates)) setNames(rep(0, ncol(covariates)), colnames(covariates)) else numeric(0),
             covariates = numeric(0),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
@@ -401,7 +337,7 @@ function( taxa,
   if (use_sem) {
     
     if(!is.null(covariates)) map$mu = factor(seq_along(p$mu))
-    if(length(beta) > 0) map$beta = factor(seq_along(p$beta))
+    if(length(sem_settings$beta) > 0) map$beta = factor(seq_along(p$beta))
     
     # Map off process error SDs (redundant with SEM SD parameters)
     p$logtau_i = rep(NA, n_species); map$logtau_i = factor(rep(NA, n_species))
@@ -440,8 +376,8 @@ function( taxa,
     # Variation in biomass
     p$epsilon_ti = array(0, dim=c(nrow(Bobs_ti), n_species) )
     map$epsilon_ti = array(seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
-    if(any(grepl("eps_", proc_vars))) {
-      map$epsilon_ti[,-as.integer(na.omit(match(gsub("eps_", "", proc_vars), taxa)))] <- NA
+    if(any(grepl("eps_", sem_settings$proc_vars))) {
+      map$epsilon_ti[,-as.integer(na.omit(match(gsub("eps_", "", sem_settings$proc_vars), taxa)))] <- NA
     } else {
       map$epsilon_ti[,] <- NA
     }
@@ -450,8 +386,8 @@ function( taxa,
     # Variation in consumption
     p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
     map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
-    if(any(grepl("nu_", proc_vars))) {
-      map$nu_ti[,-as.integer(na.omit(match(gsub("nu_", "", proc_vars), taxa)))] <- NA 
+    if(any(grepl("nu_", sem_settings$proc_vars))) {
+      map$nu_ti[,-as.integer(na.omit(match(gsub("nu_", "", sem_settings$proc_vars), taxa)))] <- NA 
     } else {
       map$nu_ti[,] <- NA
     }
@@ -460,8 +396,8 @@ function( taxa,
     # Variation in recruitment
     p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
     map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
-    if(any(grepl("phi_", proc_vars))) {
-      map$phi_tg2[,-as.integer(na.omit(match(gsub("phi_", "", proc_vars), settings$unique_stanza_groups)))] <- NA
+    if(any(grepl("phi_", sem_settings$proc_vars))) {
+      map$phi_tg2[,-as.integer(na.omit(match(gsub("phi_", "", sem_settings$proc_vars), settings$unique_stanza_groups)))] <- NA
     } else {
       map$phi_tg2[,] <- NA
     }
@@ -646,7 +582,7 @@ function( taxa,
                                 log_prior = log_prior,
                                 #DC_ij = DC_ij,
                                 stanza_data = stanza_data, 
-                                sem = sem),
+                                sem = sem_settings$model),
                     parameters = p,
                     map = map,
                     random = control$random,
@@ -755,25 +691,25 @@ function( taxa,
   # SEM 
   if (use_sem) {
     
-    sem_out <- sem[,c("path", "lag", "name")]
+    sem_out <- sem_settings$model[,c("path", "lag", "name")]
     sem_out[,c("Type", "Estimate", "Std. Error")] <- NA
     
-    off = which(sem[,'parameter'] == 0)
+    off = which(sem_settings$model[,'parameter'] == 0)
     if( length(off) > 0 ){
       
       sem_out[off, "Type"] = "Fixed"
-      sem_out[off, "Estimate"] = as.numeric(sem[off,'start'])
+      sem_out[off, "Estimate"] = as.numeric(sem_settings$model[off,'start'])
       
     }
     
-    not_off = which(sem[,'parameter'] > 0)
+    not_off = which(sem_settings$model[,'parameter'] > 0)
     if( length(not_off) > 0 ){
       
       sem_out[not_off, "Type"] = "Estimated"
-      sem_out[not_off, "Estimate"] = opt$par[which(names(opt$par) == "beta")][sem[not_off, "parameter"]]
+      sem_out[not_off, "Estimate"] = opt$par[which(names(opt$par) == "beta")][sem_settings$model[not_off, "parameter"]]
       
       if (isTRUE(control$getsd)) {
-        sem_out[not_off, "Std. Error"] = sqrt(diag(sdrep$cov.fixed))[which(names(opt$par) == "beta")][sem[not_off, "parameter"]]
+        sem_out[not_off, "Std. Error"] = sqrt(diag(sdrep$cov.fixed))[which(names(opt$par) == "beta")][sem_settings$model[not_off, "parameter"]]
       }
       
     }
