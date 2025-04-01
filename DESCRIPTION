@@ -26,6 +26,7 @@ Depends:
 Imports:
     TMB,
     MASS,
+    Matrix,
     checkmate,
     ggplot2,
     ggnetwork,

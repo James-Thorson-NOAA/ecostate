@@ -35,7 +35,7 @@ parse_ecostate_sem <- function(sem, covariates, taxa, years, fit_eps, fit_nu, se
     
   }
   
-  sem <- read_model(sem, times = years, variables = sem_vars)
+  sem <- make_dsem_ram(sem, times = years, variables = sem_vars, quiet = TRUE)$model
   
   if (any(grepl(" ", taxa))) {
     stop("If using SEM, taxa (and stanza) names must not have spaces")

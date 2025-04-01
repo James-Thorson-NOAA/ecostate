@@ -160,7 +160,7 @@ function( p,
     # SEM precision matrix
     variables <- unique(c(sem$first, sem$second))
     sem_mat <- make_matrices(p_t$beta, sem, years, variables)
-    Q <- Matrix::t(sem_mat$IminusP_kk) %*% sem_mat$invV_kk %*% sem_mat$IminusP_kk
+    Q <- t(sem_mat$IminusP_kk) %*% sem_mat$invV_kk %*% sem_mat$IminusP_kk
     
     # Observations for SEM likelihood
     Xit <- matrix(NA, nrow = length(years), ncol = length(variables))
