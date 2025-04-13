@@ -18,11 +18,12 @@ Cod, Arrowtooth, and NFS), and Taxon for each year with available data
 \item \code{Catch} is a long-form data-frame with three columns, providing the Year,
 Mass (in million metric tons), and Taxon for each year with available data
 \item \code{P_over_B} is a numeric vector with the unitless ratio of biomass production to
-population biomass for each taxon
+population biomass for each taxon (as vector names)
 \item \code{Q_over_B} is a numeric vector with the unitless ratio of biomass consumption to
-population biomass for each taxon
+population biomass for each taxon (as vector names)
 \item \code{Diet_proportions} is a numeric matrix where each column lists the
-proportion of biomass consumed that is provided by each prey (row)
+proportion of biomass consumed for each predator (column names)
+that is provided by each prey (row names)
 }
 }
 \details{
@@ -42,7 +43,7 @@ for spatially and seaonally imbalanced data.
 are derived from Rpath models, provided by Andy Whitehouse.
 \item Primary producers is an annual index of relative biomass, developed from monthly
 satellite measurements and provided by Jens Nielsen.
-See Thorson et al. (In review) for more details regarding data standardization
+See Thorson et al. (2025) for more details regarding data standardization
 and sources
 }
 }
