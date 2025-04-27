@@ -39,7 +39,7 @@ data(eastern_bering_sea)
 
 # Reformat inputs
 years = 1982:2021 # Catch only goes through 2021, and starting pre-data in 1982 doesn't play well with fit_B0
-taxa = c( "Pollock", "Cod", "Arrowtooth", "Copepod", "Other_zoop", "Chloro", "NFS", "Krill", "Benthic_invert", "Benthos", "Detritus" )
+taxa = names(eastern_bering_sea$P_over_B)
 
 # Define types
 type_i = sapply( taxa, FUN=switch, "Detritus" = "detritus",
