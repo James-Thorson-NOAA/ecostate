@@ -27,6 +27,8 @@ ecostate(
   fit_QB = vector(),
   fit_eps = vector(),
   fit_nu = vector(),
+  sem = "",
+  covariates = NULL,
   log_prior = function(p) 0,
   settings = stanza_settings(taxa = taxa),
   control = ecostate_control()
@@ -111,13 +113,27 @@ model should estimate annual process errors in dB/dt}
 \item{fit_nu}{Character-vector listing \code{taxa} for which the
 model should estimate annual process errors in consumption \code{Q_ij}}
 
-\item{log_prior}{A user-provided function that takes as input the list of
+\item{sem}{Optional specification for time-series structural equation model structure
+including lagged or simultaneous effects. Process errors for biomass, consumption,
+and recruitment can be included for a given taxa by prefixing taxa names for "eps_",
+"nu_", and "phi_", respectively. E.g., to specify an autoregressive process on
+biomass errors for a taxon named "i", we can specify a path \code{eps_i -> eps_i, 1, rho_i, 0}
+where 1 indicates a lagged effect, \code{rho_i} is a user-provided parameter name, and
+0 is a starting value. See \code{\link[dsem]{make_dsem_ram}} for an introduction to DSEM
+path notation.
+\code{\link[dsem]{make_dsem_ram}} for introduction to DSEM path notation.}
+
+\item{covariates}{Matrix of covariates (with one row per year) for use in dynamic
+structural equation model on process errors.}
+
+\item{log_prior}{A list of sampling statements representing parameter priors, or a
+user-provided function that takes as input the list of
 parameters \code{out$obj$env$parList()} where \code{out} is the output from
 \code{ecostate()}, and returns a numeric vector
 where the sum is the log-prior probability.  For example
 \code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
 specifies a lognormal prior probability for the catchability coefficient
-for the first \code{taxa} with logmean of zero and logsd of 0.1}
+for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_prior}} for details.}
 
 \item{settings}{Output from \code{\link[=stanza_settings]{stanza_settings()}}, used to define age-structured
 dynamics (called stanza-groups).}

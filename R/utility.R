@@ -100,6 +100,7 @@ ginv <- RTMB::ADjoint(function(x) {
 #' @return
 #' The log-likelihood resulting from the Dirichlet-multinomial distribution
 #'
+#'
 #' @export
 ddirmult <-
 function( x,
