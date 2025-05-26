@@ -8,7 +8,7 @@
 # Install locally if needed
 # devtools::document( R'(C:\Users\James.Thorson\Desktop\Git\EcoState)' )
 # devtools::install_local( R'(C:\Users\James.Thorson\Desktop\Git\EcoState)', force=TRUE )
-# remotes::install_github( "James-Thorson-NOAA/EcoState", force=TRUE, dep=TRUE )
+# remotes::install_github( "James-Thorson-NOAA/EcoState@add_dsem", force=TRUE, dep=TRUE )
 
 # load needed libraries
 library(pkgdown)

@@ -1,0 +1,133 @@
+---
+title: "ecostate model description"
+author: "James T. Thorson"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{ecostate model description}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+bibliography: 'refs.bib'
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, echo=FALSE, cache=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  echo = FALSE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+# Install locally
+#  devtools::install_local( R'(C:\Users\James.Thorson\Desktop\Git\ecostate)', force=TRUE )
+# Build and PDF
+#  setwd(R'(C:\Users\James.Thorson\Desktop\Git\ecostate)'); devtools::build_rmd("vignettes/model-description.Rmd"); rmarkdown::render( "vignettes/model-description.Rmd", rmarkdown::pdf_document())
+#
+# Recommended workflow:
+#  * Open in Rstudio and knit using button there
+```
+
+\newcommand{\B}{\mathbf}   <!-- math bold nonitalic -->  
+\newcommand{\PL}{\mathrm}   <!-- math nonitalic -->   
+\newcommand{\s}{\boldsymbol{s}}
+
+# Introducing ecostate
+
+`ecostate` [@thorson_benefits_2025] is an R package that implements a nonlinear state-space model representing equilibrium conditions from Ecopath [@polovina_model_1984], biomass dynamics from Ecosim [@walters_structuring_1997], and age/stage-structured dynamics from Ecosim version-2 [@walters_representing_2000].  The parameterization is heavily inspired by RPath [@lucey_conducting_2020].  However, it also adds features that are not available in EwE or Rpath including:
+
+* _Estimating equilibrium and dynamical parameters simultaneously_:  ecostate uses maximum likelihood estimation to identify the values (and standard errors) for parameters representing both ecosystem equilibrium (e.g., equilibrium biomass, production/consumption per biomass), ecosystem dynamics (e.g., ratio of initial to equilibrium biomass), and measurement parameters (e.g., catchability coefficient);
+
+* _Process errors_:  ecostate can estimate errors in both biomass index and catch measurements, as well as unexplained variation in dynamics (termed "process errors").  It then estimates the variance of process errors using hierarchical modelling techniques;
+
+* _Priors and likelihood penalties_:  ecostate allows the user to specify a Bayesian prior or likelihood penalty on parameters, rather than fixing them a priori.
+
+These features ensure that anyone running _ecostate_ can rapidly update the model using new data or ecosystem assumptions.  Results can then be exactly reproduced, allowing model performance to be explored via simulation modelling.  
+
+# State-space mass balance modelling
+
+The model starts by defining equilibrium biomass $\bar{\beta}_s$ for each taxon $s \in \{1,2,...,S\}$, and using $i$ and $j$ to refer to taxa when they are prey or predator.  Every taxon is defined as a heterotroph (consumer), autotroph (producer), or detritus pool, which affects dynamics as explained later.  This equilibrium depends upon prey production per biomass $p_i$, the proportion of prey production that is explained in the model (termed "ecotrophic efficiency") $e_i$, diet proportion $d_{i,j}$ for each predator $j$ and prey $i$, and predator consumption per biomass $w_j$:
+
+$$
+\underbrace{\bar{\beta}_i}_{\text{Equilibrium biomass as prey}} 
+\times \underbrace{p_i}_{\text{Prey production per biomass}} 
+\times \underbrace{e_i}_{\text{Ecotrophic efficiency}} = \\
+\sum_{j=1}^S{\left( 
+  \underbrace{d_{i,j}}_{\text{Proportion of diet for predator }j \text{ by prey }i}
+  \times \underbrace{\bar{\beta}_j}_{\text{Equilibrium biomass for predator }j}
+  \times \underbrace{w_j}_{\text{Predator consumption per biomass}}
+\right)}
+$$
+Autotroph and detritus taxa $j$ have no consumption so $d_{i,j}$ for these taxa.  We can then solve for the $S \times S$ matrix of equilibrium consumption $\bar{\mathbf{C}}$ as:
+
+$$
+\bar{\mathbf{C}} = \mathbf{D \odot ( 1 (\bar{\beta} \odot w)}^T ) 
+$$
+
+Given these equilibrium values, we then define a differential equation for biomass dynamics which we integrate over time to calculate biomass at times $t \in \{ 1, 2, ..., T \}$.  In parallel, we also integrate catches $\eta_s(t)$ over time, while resetting $\eta_s(t)=0$ at the beginning of each time-interval and recording the integrated catch at the end of each interval:
+
+$$
+\begin{gather}
+\frac{\text{d}}{\text{d}t} \mathbf{\beta}(t) = &  
+\left(
+  \underbrace{\mathbf{g}(t)}_{\text{Growth rate}} - 
+  \underbrace{\mathbf{m}(t)}_{\text{Natural mortality rate}} - 
+  \underbrace{\mathbf{f}(t)}_{\text{Fishing mortality rate}} + 
+  \underbrace{\mathbf{\epsilon}(t)}_{\text{Process error}}  
+\right) 
+& \odot \mathbf{\beta}(t) \\
+\frac{\text{d}}{\text{d}t} \mathbf{\eta}(t) = & \mathbf{f}(t) & \odot \mathbf{\beta}(t)
+\end{gather}
+$$
+
+where biomass growth rate $g_s(t)$ and natural mortality rate $m_s(t)$ are calculated from predicted consumption $\mathbf{C}(t)$ representing the mass $c_{i,j}(t)$ of prey $i$ consumed by predator $j$, and fishing mortality $f_s(t)$ is an estimated parameter that is informed by catch data.  
+
+Consumption $c_{i,j}(t)$ varies around the equilibrium consumption:
+
+$$
+c_{i,j}(t) = \underbrace{\bar{c}_{i,j}(t)}_{\text{equilibrium consumption rate}} \times
+\underbrace{\frac{x_{i,j}\frac{\beta_j(t)}{\bar{\beta}_j}}{x_{i,j} - 1 + \frac{\beta_j(t)}{\bar{\beta}_j}}}_{\text{predator functional response}} \times
+\underbrace{\frac{\beta_i(t)}{\bar{\beta}_i}}_{\text{prey functional response}}
+$$
+where $\mathbf{X}$ is the matrix of predator-prey vulnerability parameters $x_{i,j}$. 
+
+Natural mortality is then calculated as:
+
+$$
+m_s(t) = \underbrace{\frac{\sum_{j=1}^S c_{s,j}(t)}{\beta_s(t)}}_{\text{Predation rate}} + 
+\begin{cases}
+  \underbrace{p_s(1-e_s)}_{\text{Residual natural mortality rate}} & \text{ if } s \text{ is autotroph or heterotroph} \\
+  \underbrace{\nu_s}_{\text{Detritus loss rate}} & {\text{ if } s \text{ is detritus}}
+\end{cases}
+$$
+where residual natural mortality $p_s(1-e_s)$ accounts for predation by unmodeled taxa, senescence and disease.  
+
+The residual mortality rate is defined differently for detritus than other taxa, and this detritus loss rate $\nu_s$ is defined to ensure that net detritus accumulation matches net consumption plus export at equilibrium:
+
+$$
+\underbrace{\bar{\beta}_s \nu_s}_{\text{Equil. detritus loss}} = \underbrace{\sum_{i=1}^S \sum_{j=1}^S \mu_j \bar{c}_{i,j} + \sum_{j=1}^S \bar{\beta}_j p_s (1-e_s)}_{\text{Equil. detritus accumulation}} - \underbrace{\sum_{j=1}^S \bar{c}_{s,j}}_{\text{Equil. detritus consumption}}
+$$
+where $\mu_j$ is the proportion of consumption that is not assimilated for predator $j$ such that $\sum_{i=1}^S \sum_{j=1}^S \mu_j \bar{c}_{i,j}$ flows to detritus via unassimilated consumption.  Similarly, $p_j(1-e_j)$ is unexplained mortality which we assume flows to consumption with total $\sum_{j=1}^S \bar{\beta}_j p_s (1-e_s)$.
+
+Biomass growth rate $g_s(t)$ is also calculated from consumption:
+$$
+g_s(t) = \begin{cases}
+\frac{p_s}{w_s} \times \frac{\sum_{i=1}^S c_{i,s}(t)}{\beta_s(t)} & \text{ if } s \text{ is heterotroph} \\
+\frac{p_s \bar{\beta}_s}{\beta_s(t)} \times \frac{x_{s,s}\frac{\beta_s(t)}{\bar{\beta}_s}}{x_{s,s} - 1 + \frac{\beta_s(t)}{\bar{\beta}_s}} & \text{ if } x \text{ is autotroph} \\
+\frac{\sum_{i=1}^S \sum_{j=1}^S \mu_j c_{i,j}(t) + \sum_{j=1}^S \beta_j(t)p_j(1-e_j)}{\beta_s(t)} & \text{ if } s \text{ is detritus} 
+\end{cases}
+$$
+This expression states that:
+
+* _Heterotrophs_: The growth rate for heterotrophs is consumption per biomass times the ratio of production and consumption per biomass;
+
+* _Autotrophs_: The autotroph growth rate is calculated so that production is constant but adjusted by a Type-2 functional response using vulnerability $x_{s,s}$;
+
+* _Detritus_:  The detritus growth rate is total detritus gain per detritus biomass.  
+
+# References
+

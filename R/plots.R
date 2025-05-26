@@ -16,6 +16,8 @@
 #' @param taxa_labels character vector of labels to use for each taxon
 #' @param xloc x-axis location (overrides calculation using \code{xtracer_i})
 #' @param yloc y-axis location (overrides calculation using \code{ytracer_i})
+#' @param rescale whether to rescale flow and biomass as ratio relative to lowest value
+#'        such that values are relative rather than absolute units
 #'
 #' @details
 #' Trophic level \eqn{l_i} for each predator \eqn{i} is defined as:
@@ -36,9 +38,10 @@ function( Q_ij,
           xtracer_i,
           ytracer_i = rep(1,nrow(Q_ij)),
           B_i = rep( 1, nrow(Q_ij)), 
-          taxa_labels = letters[1:nrow(Q_ij)], 
+          taxa_labels = letters[seq_len(nrow(Q_ij))],
           xloc,
-          yloc ){
+          yloc,
+          rescale = TRUE ){
 
   #
   if(missing(yloc)){
@@ -82,15 +85,22 @@ function( Q_ij,
   #g = ggnetwork::ggnetwork( Q_ij, 
   #                          layout = layout,
   #                          weighted = TRUE )
-  g$log_flow = log(g$weight / min(g$weight,na.rm=TRUE))
-  g$log_mass = rep(NA, nrow(g))
-  g$log_mass[which(is.na(g$log_flow))] = log(B_i / min(B_i,na.rm=TRUE))
-  
+  #g$log_flow = log(g$weight / min(g$weight,na.rm=TRUE))
+  g$flow = g$weight
+  if(rescale==TRUE) g$flow = g$flow / min(g$flow,na.rm=TRUE)
+  g$mass = rep(NA, nrow(g))
+
+  # Only fill in mass for rows without a flow, which represent node masses
+  #g$log_mass[which(is.na(g$log_flow))] = log(B_i / min(B_i,na.rm=TRUE))
+  if( length(which(is.na(g$flow))) != length(B_i) ) stop("Check plotting code")
+  g$mass[which(is.na(g$flow))] = B_i
+  if(rescale==TRUE) g$mass = g$mass / min(g$mass,na.rm=TRUE)
+
   # https://stackoverflow.com/questions/9439256/how-can-i-handle-r-cmd-check-no-visible-binding-for-global-variable-notes-when
-  x = y = xend = yend = name = log_flow = log_mass = NULL
+  x = y = xend = yend = name = flow = mass = NULL
   p = ggplot2::ggplot(g, ggplot2::aes(x=x, y=y, xend=xend, yend=yend) ) +
-    ggnetwork::geom_edges( ggplot2::aes(colour=log_flow) ) +  #
-    ggnetwork::geom_nodes( ggplot2::aes(size=log_mass ) ) +  #
+    ggnetwork::geom_edges( ggplot2::aes(colour=log(flow)) ) +  #
+    ggnetwork::geom_nodes( ggplot2::aes(size=log(mass) ) ) +  #
     ggnetwork::geom_nodetext( ggplot2::aes(label=name), fontface="bold", col="red")  #
   print(p)
   return(invisible(p))
