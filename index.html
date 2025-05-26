@@ -5,14 +5,14 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>State-Space Extension of EcoPath with EcoSim • ecostate</title>
+<title>State-Space Mass-Balance Model for Marine Ecosystems • ecostate</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.4.2/css/all.min.css" rel="stylesheet">
-<link href="deps/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="State-Space Extension of EcoPath with EcoSim">
-<meta name="description" content="Fits a state-space extension of Ecopath with Ecosim (EwE) to time-series of catch and biomass. EwE is a widely used mass-balance model for biomass dynamics in aquatic ecosystems. EcoState fits biological parameters (e.g., equilibrium mass) and measurement parameters (e.g., catchability coefficients) jointly with residual variation in process errors.">
-<meta property="og:description" content="Fits a state-space extension of Ecopath with Ecosim (EwE) to time-series of catch and biomass. EwE is a widely used mass-balance model for biomass dynamics in aquatic ecosystems. EcoState fits biological parameters (e.g., equilibrium mass) and measurement parameters (e.g., catchability coefficients) jointly with residual variation in process errors.">
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="State-Space Mass-Balance Model for Marine Ecosystems">
+<meta name="description" content="Fits a state-space mass-balance model for marine ecosystems, which implements dynamics derived from `Ecopath with Ecosim` (`EwE`) &lt;https://ecopath.org/&gt; while fiting to time-series of fishery catch, biomass indices, age-composition samples, and weight-at-age data. `Ecostate` fits biological parameters (e.g., equilibrium mass) and measurement parameters (e.g., catchability coefficients) jointly with residual variation in process errors, and can include Bayesian priors for parameters.">
+<meta property="og:description" content="Fits a state-space mass-balance model for marine ecosystems, which implements dynamics derived from `Ecopath with Ecosim` (`EwE`) &lt;https://ecopath.org/&gt; while fiting to time-series of fishery catch, biomass indices, age-composition samples, and weight-at-age data. `Ecostate` fits biological parameters (e.g., equilibrium mass) and measurement parameters (e.g., catchability coefficients) jointly with residual variation in process errors, and can include Bayesian priors for parameters.">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">ecostate</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,7 +35,9 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/model_of_intermediate_complexity.html">Model of Intermediate Complexity</a></li>
+<li><a class="dropdown-item" href="articles/too_slow/age_structured_interactions.html">Age-structured and bottom-up interactions</a></li>
+    <li><a class="dropdown-item" href="articles/model-description.html">ecostate model description</a></li>
+    <li><a class="dropdown-item" href="articles/model_of_intermediate_complexity.html">Model of Intermediate Complexity</a></li>
     <li><a class="dropdown-item" href="articles/not_on_cran/simulation.html">Demonstrating EcoState via simulation</a></li>
     <li><a class="dropdown-item" href="articles/not_on_cran/surplus_production.html">EcoState as surplus production model</a></li>
     <li><a class="dropdown-item" href="articles/too_slow/whole_of_ecosystem.html">Whole of ecosystem model</a></li>
@@ -58,7 +60,7 @@
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header"><h1 id="ecostate">EcoState<a class="anchor" aria-label="anchor" href="#ecostate"></a>
 </h1></div>
-<p><a href="https://james-thorson-noaa.github.io/ecostate/" class="external-link"><img src="https://img.shields.io/badge/documentation-ecostate-orange.svg?colorB=E91E63" alt="Documentation"></a></p>
+<p><a href="https://cran.r-project.org/package=ecostate" class="external-link"><img src="https://www.r-pkg.org/badges/version/ecostate"></a> <a href="https://cran.r-project.org/package=ecostate" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/ecostate"></a> <a href="https://cran.r-project.org/package=ecostate" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/grand-total/ecostate"></a> <a href="https://james-thorson-noaa.github.io/ecostate/" class="external-link"><img src="https://img.shields.io/badge/documentation-ecostate-orange.svg?colorB=E91E63" alt="Documentation"></a></p>
 <p>Package <em>ecostate</em> fits a state-space mass-balance model <em>EcoState</em> intended for aquatic ecosystems, using mass-balance equations matching those from Ecopath and dynamical equations matching Ecosim. Unlike the Ecopath-with-Ecosim (<em>EwE</em>) package, <em>ecostate</em> fits both biological parameters (e.g., equilibrium biomass and predator-prey vulnerability) and measurement parameters (e.g., catchability coefficients) via fit to time-series data. <em>ecostate</em> also estimates additional process errors representing nonstationarity in growth efficiency, ecotrophic efficient, migration, or other unmodeled processes. These process errors allow biomass patterns to closely match available data, so that resulting consumption (and associated productivity and mortality rates) can accurately be conditioned upon any residual patterns.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -77,15 +79,35 @@
 <div class="section level1">
 <h1 id="more-details">More details<a class="anchor" aria-label="anchor" href="#more-details"></a>
 </h1>
-<p>For more background please read:</p>
-<p>Thorson, J. Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. EcoState: Extending Ecopath with Ecosim to estimate biological parameters and process errors using RTMB and time-series data. Pre-print URL: <a href="https://doi.org/10.32942/X2QK81" class="external-link uri">https://doi.org/10.32942/X2QK81</a></p>
-<p>or the updated version:</p>
-<p>Thorson, J. Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. (In press) The benefits of hierarchical ecosystem models: demonstration using a new state-space mass-balance model EcoState. Fish and Fisheries.</p>
+<p>For more background, please read:</p>
+<div class="section level3">
+<h3 id="for-state-space-mass-balance-equilibrium-and-biomass-dynamic-modelling">For state-space mass-balance equilibrium and biomass-dynamic modelling<a class="anchor" aria-label="anchor" href="#for-state-space-mass-balance-equilibrium-and-biomass-dynamic-modelling"></a>
+</h3>
+<p>Thorson, J. Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. (In press) The benefits of hierarchical ecosystem models: demonstration using a new state-space mass-balance model EcoState. Fish and Fisheries. <a href="https://doi.org/10.1111/faf.12874" class="external-link uri">https://doi.org/10.1111/faf.12874</a></p>
+</div>
+<div class="section level3">
+<h3 id="for-age-structured-dynamics-and-bottom-up-linkages-to-animal-growth">For age-structured dynamics and bottom-up linkages to animal growth:<a class="anchor" aria-label="anchor" href="#for-age-structured-dynamics-and-bottom-up-linkages-to-animal-growth"></a>
+</h3>
+<p>Thorson, J. T., Aydin, K. H., Cheng, M., Dias, B. S., Kimmel, D. G., &amp; Kristensen, K. (2025). Bottom-up interactions in age-structured stock assessment and state-space mass-balance modelling. <a href="https://ecoevorxiv.org/repository/view/8411/" class="external-link uri">https://ecoevorxiv.org/repository/view/8411/</a></p>
+</div>
+<div class="section level3">
+<h3 id="for-original-development-of-ecopath-for-mass-balance-equilibria">For original development of ecopath for mass-balance equilibria:<a class="anchor" aria-label="anchor" href="#for-original-development-of-ecopath-for-mass-balance-equilibria"></a>
+</h3>
+<p>Polovina, J. J. (1984). Model of a coral reef ecosystem. Coral Reefs, 3(1), 1–11. <a href="https://doi.org/10.1007/BF00306135" class="external-link uri">https://doi.org/10.1007/BF00306135</a></p>
+</div>
+<div class="section level3">
+<h3 id="for-development-of-ecosim-for-deterministic-biomass-and-age-structured-dynamics">For development of ecosim for deterministic biomass and age-structured dynamics:<a class="anchor" aria-label="anchor" href="#for-development-of-ecosim-for-deterministic-biomass-and-age-structured-dynamics"></a>
+</h3>
+<p>Christensen, V., &amp; Walters, C. J. (2004). Ecopath with Ecosim: Methods, capabilities and limitations. Ecological Modelling, 172(2), 109–139. <a href="https://doi.org/10.1016/j.ecolmodel.2003.09.003" class="external-link uri">https://doi.org/10.1016/j.ecolmodel.2003.09.003</a></p>
+<p>Walters, C., Christensen, V., &amp; Pauly, D. (1997). Structuring dynamic models of exploited ecosystems from trophic mass-balance assessments. Reviews in Fish Biology and Fisheries, 7(2), 139–172. <a href="https://doi.org/10.1023/A:1018479526149" class="external-link uri">https://doi.org/10.1023/A:1018479526149</a></p>
+<p>Walters, C., Pauly, D., Christensen, V., &amp; Kitchell, J. F. (2000). Representing Density Dependent Consequences of Life History Strategies in Aquatic Ecosystems: EcoSim II. Ecosystems, 3(1), 70–83. <a href="https://doi.org/10.1007/s100210000011" class="external-link uri">https://doi.org/10.1007/s100210000011</a></p>
+</div>
 </div>
 
   </main><aside class="col-md-3"><div class="links">
 <h2 data-toc-skip>Links</h2>
 <ul class="list-unstyled">
+<li><a href="https://cloud.r-project.org/package=ecostate" class="external-link">View on CRAN</a></li>
 <li><a href="https://github.com/James-Thorson-NOAA/ecostate/" class="external-link">Browse source code</a></li>
 <li><a href="https://github.com/James-Thorson-NOAA/ecostate/issues" class="external-link">Report a bug</a></li>
 </ul>
@@ -109,7 +131,8 @@
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>James T. Thorson <br><small class="roles"> Author, maintainer </small> <a href="https://orcid.org/0000-0001-7415-1010" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a> </li>
+<li>James T. Thorson <br><small class="roles"> Author, maintainer </small> <a href="https://orcid.org/0000-0001-7415-1010" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
+<li><a href="authors.html">More about authors...</a></li>
 </ul>
 </div>
 
@@ -124,7 +147,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.2.</p>
 </div>
 
     </footer>

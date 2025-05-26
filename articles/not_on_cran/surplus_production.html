@@ -8,8 +8,8 @@
 <title>EcoState as surplus production model • ecostate</title>
 <script src="../../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../../deps/font-awesome-6.4.2/css/all.min.css" rel="stylesheet">
-<link href="../../deps/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet">
+<script src="../../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../../deps/headroom-0.11.0/headroom.min.js"></script><script src="../../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../../deps/search-1.0.0/fuse.min.js"></script><script src="../../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../../pkgdown.js"></script><meta property="og:title" content="EcoState as surplus production model">
 </head>
 <body>
@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../../index.html">ecostate</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,7 +33,9 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../../articles/model_of_intermediate_complexity.html">Model of Intermediate Complexity</a></li>
+<li><a class="dropdown-item" href="../../articles/too_slow/age_structured_interactions.html">Age-structured and bottom-up interactions</a></li>
+    <li><a class="dropdown-item" href="../../articles/model-description.html">ecostate model description</a></li>
+    <li><a class="dropdown-item" href="../../articles/model_of_intermediate_complexity.html">Model of Intermediate Complexity</a></li>
     <li><a class="dropdown-item" href="../../articles/not_on_cran/simulation.html">Demonstrating EcoState via simulation</a></li>
     <li><a class="dropdown-item" href="../../articles/not_on_cran/surplus_production.html">EcoState as surplus production model</a></li>
     <li><a class="dropdown-item" href="../../articles/too_slow/whole_of_ecosystem.html">Whole of ecosystem model</a></li>
@@ -228,7 +230,7 @@ production model with Gompertz effort dynamics:</p>
 <span><span class="co"># print output to terminal</span></span>
 <span><span class="va">out</span></span>
 <span><span class="co">#&gt; Dynamics integrated using  ABM  with  10  time-steps</span></span>
-<span><span class="co">#&gt; Run time: Time difference of 4.512951 secs</span></span>
+<span><span class="co">#&gt; Run time: Time difference of 4.54516 secs</span></span>
 <span><span class="co">#&gt; Negative log-likelihood: -74.51341</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; EcoSim parameters:</span></span>
@@ -405,7 +407,7 @@ data:</p>
 <span><span class="co"># print output to terminal</span></span>
 <span><span class="va">out_bivar</span></span>
 <span><span class="co">#&gt; Dynamics integrated using  ABM  with  10  time-steps</span></span>
-<span><span class="co">#&gt; Run time: Time difference of 44.77589 secs</span></span>
+<span><span class="co">#&gt; Run time: Time difference of 22.38911 secs</span></span>
 <span><span class="co">#&gt; Negative log-likelihood: -75.16433</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; EcoSim parameters:</span></span>
@@ -520,7 +522,7 @@ time-series of average age and average weight.</p>
 <span><span class="co"># print output to terminal</span></span>
 <span><span class="va">out_stanzas</span></span>
 <span><span class="co">#&gt; Dynamics integrated using  ABM  with  10  time-steps</span></span>
-<span><span class="co">#&gt; Run time: Time difference of 54.95873 secs</span></span>
+<span><span class="co">#&gt; Run time: Time difference of 25.97284 secs</span></span>
 <span><span class="co">#&gt; Negative log-likelihood: -71.35349</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; EcoSim parameters:</span></span>
@@ -633,7 +635,7 @@ Here, we specify identical diet but varying bioenergetics by size:</p>
 <span><span class="co"># print output to terminal</span></span>
 <span><span class="va">out_trivar</span></span>
 <span><span class="co">#&gt; Dynamics integrated using  ABM  with  10  time-steps</span></span>
-<span><span class="co">#&gt; Run time: Time difference of 2.824025 mins</span></span>
+<span><span class="co">#&gt; Run time: Time difference of 1.304584 mins</span></span>
 <span><span class="co">#&gt; Negative log-likelihood: -70.41958</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; EcoSim parameters:</span></span>
@@ -662,7 +664,7 @@ Here, we specify identical diet but varying bioenergetics by size:</p>
 <span><span class="co">#&gt; logtau_i  0.3498846 0.37557231</span></span>
 <span><span class="co">#&gt; logtau_i -3.1440545 0.50456842</span></span>
 <span><span class="co">#&gt; logq_i   -0.1292594 0.09806604</span></span>
-<span><span class="co">#&gt; Maximum gradient component: 1.809354e-09</span></span></code></pre></div>
+<span><span class="co">#&gt; Maximum gradient component: 1.808871e-09</span></span></code></pre></div>
 <p>The model includes process-errors in the first-stage (eggs to
 recruits, from age-0 to age-2) and the second stage (age-2 onward),
 although the variance for stage-1 collapses to zero in this simulation
@@ -733,7 +735,7 @@ Assessment (JABBA):</p>
 <span><span class="co">#&gt; &gt;&lt;&gt; Produce results output of Schaefer model for target TestRun &lt;&gt;&lt;</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; &gt;&lt;&gt; Scenario TestRun_Schaefer completed in 0 min and 35 sec &lt;&gt;&lt;</span></span>
+<span><span class="co">#&gt; &gt;&lt;&gt; Scenario TestRun_Schaefer completed in 0 min and 16 sec &lt;&gt;&lt;</span></span>
 <span></span>
 <span><span class="co"># Make individual plots</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/JABBA/man/jbplot_cpuefits.html" class="external-link">jbplot_cpuefits</a></span><span class="op">(</span><span class="va">bet1</span><span class="op">)</span></span>
@@ -809,7 +811,7 @@ in average age and size.</p>
 </tr>
 </tbody>
 </table>
-<p>Runtime for this vignette: 5.41 mins</p>
+<p>Runtime for this vignette: 2.67 mins</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -822,7 +824,7 @@ in average age and size.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.2.</p>
 </div>
 
     </footer>
