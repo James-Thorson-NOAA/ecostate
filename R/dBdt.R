@@ -58,6 +58,7 @@ function( Time,
   detritus_turnover = Pars$detritus_turnover
   epsilon_i = Pars$epsilon_i
   nu_i = Pars$nu_i
+  nu_ij = Pars$nu_ij
 
   # Indicators
   which_primary = which( type_i=="auto" )
@@ -69,7 +70,7 @@ function( Time,
   Ypred_ij = rep(1,n_species) %*% t(Ypred_j)
   Yprey_i = Bt_i / B_i
   Yprey_ij = Yprey_i %*% t(rep(1,n_species))
-  nu_ij = rep(1,n_species) %*% t(nu_i)
+  nu_ij = rep(1,n_species) %*% t(nu_i) + t(nu_ij)
   # Consumption = Equilibrium * Pred_functional_response * Prey_functional_response
   #Qe_ij = adsparse_to_matrix(Qe_ij)
   Q_ij = Qe_ij * ( X_ij * Ypred_ij / ( X_ij - 1 + Ypred_ij ) ) * Yprey_ij * exp(nu_ij)
