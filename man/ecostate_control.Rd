@@ -7,8 +7,8 @@
 ecostate_control(
   nlminb_loops = 1,
   newton_loops = 0,
-  eval.max = 1000,
-  iter.max = 1000,
+  eval.max = 5000,
+  iter.max = 5000,
   getsd = TRUE,
   silent = getOption("ecostate.silent", TRUE),
   trace = getOption("ecostate.trace", 0),
