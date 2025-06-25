@@ -56,8 +56,7 @@ function( p,
           settings,
           control,
           simulate_data = FALSE,
-          simulate_random = FALSE, 
-          debug = 0) {
+          simulate_random = FALSE) {
   
   # Necessary in packages
   "c" <- ADoverload("c")
