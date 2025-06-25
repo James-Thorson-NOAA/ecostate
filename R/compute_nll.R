@@ -152,7 +152,6 @@ function( p,
   #Y_tzz[1,,] = Y_zz
 
   # Hyperdistribution for random effects
-  if (debug == 2) browser()
   use_sem <- class(sem) == "data.frame"
   if (use_sem) {
     
@@ -250,7 +249,6 @@ function( p,
   }
 
   # Loop through years
-  if (debug == 3) browser()
   for( t in 2:nrow(Bobs_ti) ){
   #for( t in 2:66 ){
     # Assemble inputs
@@ -381,7 +379,6 @@ function( p,
   Z_ti = F_ti + M_ti 
   
   # likelihood
-  if (debug == 4) browser()
   Bexp_ti = B_ti * (rep(1,nrow(B_ti)) %*% t(exp(p$logq_i)))
   for( i in seq_len(n_species) ){
   for( t in seq_len(nrow(Bexp_ti)) ){
@@ -430,7 +427,6 @@ function( p,
       }
       # Comps are end-of-year abundance
       # Record comps
-      if (debug == 5) browser()
       Nexp_ta_g2[[index]][index2,] = Nexp_a[-1] + settings$min_agecomp_prob  # Remove age-0 ... add 1e-12 to avoid prob=0, which crashes gradients
       # Remove any NAs
       which_obs = which(!is.na((Nobs_ta_g2[[index]])[index2,]))
@@ -460,7 +456,6 @@ function( p,
   }
 
   # Empirical weight-at-age
-  if (debug == 6) browser()
   for( index in seq_along(Wobs_ta_g2) ){
     g2 = match( names(Wobs_ta_g2)[index], settings$unique_stanza_groups )
     #which_z = which( stanza_data$X_zz[,'g2'] == g2 )

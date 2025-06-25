@@ -155,8 +155,7 @@ function( taxa,
           covariates = NULL,
           log_prior = function(p) 0,
           settings = stanza_settings(taxa=taxa),
-          control = ecostate_control(), 
-          debug = 0){
+          control = ecostate_control()){
   # importFrom RTMB MakeADFun REPORT ADREPORT sdreport getAll
   # importFrom Matrix Matrix Diagonal sparseMatrix
 
@@ -255,28 +254,77 @@ function( taxa,
   #DC_ij = Matrix::Matrix(DC_ij)
   
   # Convert long-form `catch` to wide-form Cobs_ti
-  Cobs_ti = tapply( catch[,'Mass'], FUN=mean, INDEX = list(
-                    factor(catch[,'Year'],levels=years),
-                    factor(catch[,'Taxon'],levels=taxa) )
+  Cobs_ti = tapply( catch[,'Mass', drop = TRUE], FUN=mean, INDEX = list(
+                    factor(catch[,'Year', drop = TRUE], levels=years),
+                    factor(catch[,'Taxon', drop = TRUE], levels=taxa) )
                   )
   if(any(!is.na(Cobs_ti[1,]))) message("Fixing catch=NA in first year as required")
   Cobs_ti[1,] = NA
   
   # Convert long-form `biomass` to wide-form Bobs_ti
-  Bobs_ti = tapply( biomass[,'Mass'], FUN=mean, INDEX = list(
-                    factor(biomass[,'Year'],levels=years),
-                    factor(biomass[,'Taxon'],levels=taxa) )
+  Bobs_ti = tapply( biomass[,'Mass', drop = TRUE], FUN=mean, INDEX = list(
+                    factor(biomass[,'Year', drop = TRUE], levels=years),
+                    factor(biomass[,'Taxon', drop = TRUE], levels=taxa) )
                   )
   
-  #
+  # Unpack agecomp data
   assertList( agecomp )
-  Nobs_ta_g2 = agecomp[match(names(agecomp),settings$unique_stanza_groups)]  # match works for empty list
-  # ADD MORE CHECKS
+  Nobs_ta_g2 <- agecomp[settings$unique_stanza_groups[settings$unique_stanza_groups %in% names(agecomp)]]
 
-  #
+  # Checks for agecomp data
+  for (i in seq_along(agecomp)) {
+    
+    if (!(names(agecomp)[i] %in% settings$unique_stanza_groups)) {
+      stop ("agecomp must be a named list with names corresponding to stanza groups")
+    }
+    
+    Amax_i <- max(settings$Amax[settings$stanza_groups == names(agecomp)[i]])
+    
+    if (ncol(agecomp[[i]]) != (Amax_i - 1)) {
+      stop(paste0(names(agecomp)[i], " agecomp matrix should have colums for ages 1-", Amax_i - 1, ". NAs are allowed."))  
+    }
+    
+    Ayrs_i <- as.integer(rownames(agecomp[[i]]))
+    
+    if (!all(Ayrs_i %in% years)) {
+      warning(paste("Some years in", names(agecomp)[i], "agecomp data are outside the range of modeled years."))
+    }
+    
+    if (settings$comp_weight == "dir" & any(agecomp[[i]] == 0 & !is.na(agecomp[[i]]))) {
+      stop("agecomp data cannot contain zeroes if settings$comp_weight == 'dir'")
+    }
+    
+  }
+  
+  # Unpack weight-at-age data
   assertList( weight )
-  Wobs_ta_g2 = weight[match(names(weight),settings$unique_stanza_groups)]  # match works for empty list
-
+  Wobs_ta_g2 = weight[settings$unique_stanza_groups[settings$unique_stanza_groups %in% names(weight)]]  # match works for empty list
+  
+  # Checks for weight-at-age data
+  for (i in seq_along(weight)) {
+    
+    if (!(names(weight)[i] %in% settings$unique_stanza_groups)) {
+      stop ("weight must be a named list with names corresponding to stanza groups")
+    }
+    
+    Amax_i <- max(settings$Amax[settings$stanza_groups == names(weight)[i]])
+    
+    if (ncol(weight[[i]]) != (Amax_i - 1)) {
+      stop(paste0(names(agecomp)[i], " weight-at-age matrix should have colums for ages 1-", Amax_i - 1, ". NAs are allowed."))  
+    }
+    
+    Wyrs_i <- as.integer(rownames(weight[[i]]))
+    
+    if (!all(Wyrs_i %in% years)) {
+      warning(paste("Some years in", names(weight)[i], "weight-at-age data are outside the range of modeled years."))
+    }
+    
+    if (any(weight[[i]] == 0 & !is.na(weight[[i]]))) {
+      stop("weight-at-age data cannot contain zeroes, given the assumed lognormal distribution")
+    }
+    
+  }
+  
   #
   stanza_data = make_stanza_data( settings )
 
@@ -581,13 +629,6 @@ function( taxa,
   #cmb <- function(f, d) function(p) f(p, d) ## Helper to make closure
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
   
-  if (debug == 1) {
-    random = control$random
-    profile = control$profile
-    silent = control$silent
-    browser()
-  }
-  
   obj <- MakeADFun( func = cmb( compute_nll,
                                 Bobs_ti = Bobs_ti,
                                 Cobs_ti = Cobs_ti,
@@ -606,8 +647,7 @@ function( taxa,
                                 log_prior = log_prior,
                                 #DC_ij = DC_ij,
                                 stanza_data = stanza_data, 
-                                sem = sem_settings$model, 
-                                debug = debug),
+                                sem = sem_settings$model),
                     parameters = p,
                     map = map,
                     random = control$random,
