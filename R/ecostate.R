@@ -192,10 +192,6 @@ function( taxa,
     U = rep(0.2, n_species)
     names(U) = taxa
   }  
-  if(missing(type)){
-    type = ifelse(colSums(DC_ij)==0, "auto", "hetero")
-    names(type) = taxa
-  }
   
   # Configuring inputs
   if(!all(taxa %in% names(PB))) stop("Check names for `PB`")
@@ -209,8 +205,14 @@ function( taxa,
   logB_i = log(B[taxa])
   DC_ij = DC[taxa,taxa,drop=FALSE]
   EE_i = EE[taxa]
-  type_i = type[taxa]
   U_i = U[taxa]
+  
+  if(missing(type)){
+    type = ifelse(colSums(DC_ij)==0, "auto", "hetero")
+    names(type) = taxa
+  }
+  
+  type_i = type[taxa]
   
   # Deal with V
   if(missing(X)){
@@ -253,28 +255,77 @@ function( taxa,
   #DC_ij = Matrix::Matrix(DC_ij)
   
   # Convert long-form `catch` to wide-form Cobs_ti
-  Cobs_ti = tapply( catch[,'Mass'], FUN=mean, INDEX = list(
-                    factor(catch[,'Year'],levels=years),
-                    factor(catch[,'Taxon'],levels=taxa) )
+  Cobs_ti = tapply( catch[,'Mass', drop = TRUE], FUN=mean, INDEX = list(
+                    factor(catch[,'Year', drop = TRUE], levels=years),
+                    factor(catch[,'Taxon', drop = TRUE], levels=taxa) )
                   )
   if(any(!is.na(Cobs_ti[1,]))) message("Fixing catch=NA in first year as required")
   Cobs_ti[1,] = NA
   
   # Convert long-form `biomass` to wide-form Bobs_ti
-  Bobs_ti = tapply( biomass[,'Mass'], FUN=mean, INDEX = list(
-                    factor(biomass[,'Year'],levels=years),
-                    factor(biomass[,'Taxon'],levels=taxa) )
+  Bobs_ti = tapply( biomass[,'Mass', drop = TRUE], FUN=mean, INDEX = list(
+                    factor(biomass[,'Year', drop = TRUE], levels=years),
+                    factor(biomass[,'Taxon', drop = TRUE], levels=taxa) )
                   )
   
-  #
+  # Unpack agecomp data
   assertList( agecomp )
-  Nobs_ta_g2 = agecomp[match(names(agecomp),settings$unique_stanza_groups)]  # match works for empty list
-  # ADD MORE CHECKS
+  Nobs_ta_g2 <- agecomp[settings$unique_stanza_groups[settings$unique_stanza_groups %in% names(agecomp)]]
 
-  #
+  # Checks for agecomp data
+  for (i in seq_along(agecomp)) {
+    
+    if (!(names(agecomp)[i] %in% settings$unique_stanza_groups)) {
+      stop ("agecomp must be a named list with names corresponding to stanza groups")
+    }
+    
+    Amax_i <- max(settings$Amax[settings$stanza_groups == names(agecomp)[i]])
+    
+    if (ncol(agecomp[[i]]) != (Amax_i - 1)) {
+      stop(paste0(names(agecomp)[i], " agecomp matrix should have colums for ages 1-", Amax_i - 1, ". NAs are allowed."))  
+    }
+    
+    Ayrs_i <- as.integer(rownames(agecomp[[i]]))
+    
+    if (!all(Ayrs_i %in% years)) {
+      warning(paste("Some years in", names(agecomp)[i], "agecomp data are outside the range of modeled years."))
+    }
+    
+    if (settings$comp_weight == "dir" & any(agecomp[[i]] == 0 & !is.na(agecomp[[i]]))) {
+      stop("agecomp data cannot contain zeroes if settings$comp_weight == 'dir'")
+    }
+    
+  }
+  
+  # Unpack weight-at-age data
   assertList( weight )
-  Wobs_ta_g2 = weight[match(names(weight),settings$unique_stanza_groups)]  # match works for empty list
-
+  Wobs_ta_g2 = weight[settings$unique_stanza_groups[settings$unique_stanza_groups %in% names(weight)]]  # match works for empty list
+  
+  # Checks for weight-at-age data
+  for (i in seq_along(weight)) {
+    
+    if (!(names(weight)[i] %in% settings$unique_stanza_groups)) {
+      stop ("weight must be a named list with names corresponding to stanza groups")
+    }
+    
+    Amax_i <- max(settings$Amax[settings$stanza_groups == names(weight)[i]])
+    
+    if (ncol(weight[[i]]) != (Amax_i - 1)) {
+      stop(paste0(names(weight)[i], " weight-at-age matrix should have colums for ages 1-", Amax_i - 1, ". NAs are allowed."))  
+    }
+    
+    Wyrs_i <- as.integer(rownames(weight[[i]]))
+    
+    if (!all(Wyrs_i %in% years)) {
+      warning(paste("Some years in", names(weight)[i], "weight-at-age data are outside the range of modeled years."))
+    }
+    
+    if (any(weight[[i]] == 0 & !is.na(weight[[i]]))) {
+      stop("weight-at-age data cannot contain zeroes, given the assumed lognormal distribution")
+    }
+    
+  }
+  
   #
   stanza_data = make_stanza_data( settings )
 
@@ -299,6 +350,7 @@ function( taxa,
             epsilon_ti = array( 0, dim=c(0,n_species) ),
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
+            nu_tij = array(0, dim = c(nrow(Bobs_ti), n_species, n_species)),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
             beta = if (use_sem && length(sem_settings$beta) > 0) sem_settings$beta else numeric(0),
             mu = if (!is.null(covariates)) setNames(rep(0, ncol(covariates)), colnames(covariates)) else numeric(0),
@@ -383,15 +435,27 @@ function( taxa,
     }
     map$epsilon_ti = factor(map$epsilon_ti)
     
-    # Variation in consumption
+    # Variation in consumption by predator
     p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
     map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
-    if(any(grepl("nu_", sem_settings$proc_vars))) {
-      map$nu_ti[,-as.integer(na.omit(match(gsub("nu_", "", sem_settings$proc_vars), taxa)))] <- NA 
+    if(any(grepl("nu_", sem_settings$proc_vars) & !(grepl(":", sem_settings$proc_vars)))) {
+      map$nu_ti[,-as.integer(na.omit(match(gsub("nu_", "", sem_settings$proc_vars), taxa)))] <- NA
     } else {
       map$nu_ti[,] <- NA
     }
     map$nu_ti = factor(map$nu_ti)
+    
+    # Variation in consumption by predator-prey pair
+    map$nu_tij = array(NA, dim = dim(p$nu_tij))
+    if (any(grepl("nu_", sem_settings$proc_vars) & grepl(":", sem_settings$proc_vars))) {
+      pred_prey <- strsplit(gsub("nu_", "", sem_settings$proc_vars[grepl("nu_", sem_settings$proc_vars) & grepl(":", sem_settings$proc_vars)]), ":")
+      which_pred = vapply(pred_prey, function(x) match(x[1], taxa), integer(1))
+      which_prey = vapply(pred_prey, function(x) match(x[2], taxa), integer(1))
+      for (i in seq_along(pred_prey)) {
+        map$nu_tij[, which_pred[i], which_prey[i]] <- array(seq_len(prod(dim(p$nu_tij))), dim = dim(p$nu_tij))[, which_pred[i], which_prey[i]]
+      }
+    }
+    map$nu_tij = factor(map$nu_tij)
     
     # Variation in recruitment
     p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
@@ -437,6 +501,7 @@ function( taxa,
     # Variation in consumption
     p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
     map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
+    map$nu_tij =  factor(rep(NA, length(c(p$nu_tij))))
     for(i in seq_len(n_species)){
       if( is.na(p$logsigma_i[i]) ){
         p$nu_ti[,i] = 0
@@ -460,6 +525,7 @@ function( taxa,
   # Set names
   colnames(p$epsilon_ti) = colnames(p$alpha_ti) = colnames(p$nu_ti) = colnames(p$logF_ti) = taxa
   colnames(p$phi_tg2) = settings$unique_stanza_groups
+  dimnames(p$nu_tij) <- list(year = years, predator = taxa, prey = taxa)
 
   # Measurement errors
   p$ln_sdB = log(0.1)
@@ -842,7 +908,7 @@ function( nlminb_loops = 1,
           trace = getOption("ecostate.trace", 0),
           verbose = getOption("ecostate.verbose", FALSE),
           profile = c("logF_ti","log_winf_z","s50_z","srate_z"),
-          random = c("epsilon_ti","alpha_ti","nu_ti","phi_tg2","covariates"),
+          random = c("epsilon_ti","alpha_ti","nu_ti","nu_tij","phi_tg2","covariates"),
           tmb_par = NULL,
           map = NULL,
           getJointPrecision = FALSE,

@@ -46,8 +46,8 @@ parse_ecostate_sem <- function(sem, covariates, taxa, years, fit_eps, fit_nu, se
       stop("If using SEM, taxa (and stanza) names must not have spaces")
     }
     for (i in seq_along(proc_vars)) {
-      if (gsub("eps_|nu_", "", proc_vars[i]) %in% settings$unique_stanza_groups) {
-        if (!(gsub("eps_|nu_", "", proc_vars[i]) %in% taxa)) {
+      if (any(strsplit(gsub("eps_|nu_", "", proc_vars[i]), ":")[[1]] %in% settings$unique_stanza_groups)) {
+        if (!any(strsplit(gsub("eps_|nu_", "", proc_vars[i]), ":")[[1]] %in% taxa)) {
           stop("epsilon and nu process errors must be specified for taxa, not stanza groups")
         }
       }
