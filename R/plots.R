@@ -134,6 +134,7 @@ plot_timeseries <- function(fit, taxa, observed = TRUE, interval = 0.95, q_adj =
     B_ti[["se"]] <- fit$derived$SE$B_ti
   } else if (!isFALSE(interval)) {
     message("`interval` is ignored when standard errors of derived quantities are missing")
+    interval <- FALSE
   }
   
   # Observed (survey) biomass
@@ -188,7 +189,7 @@ plot_timeseries <- function(fit, taxa, observed = TRUE, interval = 0.95, q_adj =
   # Plot estimate adjusted for catchability
   if (isTRUE(q_adj)) {
     colors <- c(colors, "Bhat * q" = "blue")
-    p <- p + ggplot2::geom_line(aggplot2::es(y = est_q, color = "Bhat * q"), na.rm = TRUE) 
+    p <- p + ggplot2::geom_line(ggplot2::aes(y = est_q, color = "Bhat * q"), na.rm = TRUE) 
   }
   
   # Plot survey data

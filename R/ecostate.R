@@ -205,13 +205,14 @@ function( taxa,
   logB_i = log(B[taxa])
   DC_ij = DC[taxa,taxa,drop=FALSE]
   EE_i = EE[taxa]
-  type_i = type[taxa]
   U_i = U[taxa]
   
   if(missing(type)){
     type = ifelse(colSums(DC_ij)==0, "auto", "hetero")
     names(type) = taxa
   }
+  
+  type_i = type[taxa]
   
   # Deal with V
   if(missing(X)){
@@ -310,7 +311,7 @@ function( taxa,
     Amax_i <- max(settings$Amax[settings$stanza_groups == names(weight)[i]])
     
     if (ncol(weight[[i]]) != (Amax_i - 1)) {
-      stop(paste0(names(agecomp)[i], " weight-at-age matrix should have colums for ages 1-", Amax_i - 1, ". NAs are allowed."))  
+      stop(paste0(names(weight)[i], " weight-at-age matrix should have colums for ages 1-", Amax_i - 1, ". NAs are allowed."))  
     }
     
     Wyrs_i <- as.integer(rownames(weight[[i]]))
