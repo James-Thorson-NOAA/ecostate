@@ -1,11 +1,12 @@
-citHeader("For methodological details regarding EcoState, please see Thorson et al. (In review).")
+citHeader("For methodological details regarding EcoState, please see Thorson et al. (2014).")
 
 bibentry(bibtype = "Article",
-           textVersion = "Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. EcoState:  Extending Ecopath with Ecosim to estimate biological parameters and process errors using RTMB and time-series data",
-           title = "EcoState:  Extending Ecopath with Ecosim to estimate biological parameters and process errors using RTMB and time-series data",
-           journal = "In review",
+           textVersion = "Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. The Benefits of Hierarchical Ecosystem Models: Demonstration Using EcoState, a New State-Space Mass-Balance Model",
+           title = "The Benefits of Hierarchical Ecosystem Models: Demonstration Using EcoState, a New State-Space Mass-Balance Model",
+           journal = "Fish and Fisheries",
            year = "2024",
-           url = "https://doi.org/10.32942/X2QK81",
+           doi = "10.1111/faf.12874",
+           url = "https://doi.org/10.1111/faf.12874",
            author = c(person(given = c("J.", "T."),
                              family = "Thorson"),
                       person(given = c("K."),

@@ -10,9 +10,10 @@ plot_foodweb(
   xtracer_i,
   ytracer_i = rep(1, nrow(Q_ij)),
   B_i = rep(1, nrow(Q_ij)),
-  taxa_labels = letters[1:nrow(Q_ij)],
+  taxa_labels = letters[seq_len(nrow(Q_ij))],
   xloc,
-  yloc
+  yloc,
+  rescale = TRUE
 )
 }
 \arguments{
@@ -32,6 +33,9 @@ plot_foodweb(
 \item{xloc}{x-axis location (overrides calculation using \code{xtracer_i})}
 
 \item{yloc}{y-axis location (overrides calculation using \code{ytracer_i})}
+
+\item{rescale}{whether to rescale flow and biomass as ratio relative to lowest value
+such that values are relative rather than absolute units}
 }
 \value{
 invisibly return \code{ggplot} object for foodweb

@@ -52,6 +52,17 @@
 #'        model should estimate annual process errors in dB/dt
 #' @param fit_nu Character-vector listing \code{taxa} for which the
 #'        model should estimate annual process errors in consumption \code{Q_ij}
+#' @param sem Optional specification for time-series structural equation model structure
+#'        including lagged or simultaneous effects. Process errors for biomass, consumption,
+#'        and recruitment can be included for a given taxa by prefixing taxa names for "eps_",
+#'        "nu_", and "phi_", respectively. E.g., to specify an autoregressive process on 
+#'        biomass errors for a taxon named "i", we can specify a path \code{eps_i -> eps_i, 1, rho_i, 0}
+#'        where 1 indicates a lagged effect, \code{rho_i} is a user-provided parameter name, and
+#'        0 is a starting value. See \code{\link[dsem]{make_dsem_ram}} for an introduction to DSEM 
+#'        path notation.
+#'        \code{\link[dsem]{make_dsem_ram}} for introduction to DSEM path notation.
+#' @param covariates Matrix of covariates (with one row per year) for use in dynamic 
+#'        structural equation model on process errors.
 #' @param fit_PB Character-vector listing \code{taxa} for which equilibrium
 #'        production per biomass is estimated.  Note that it is likely
 #'        a good idea to include a prior for any species for which this is estimated.
@@ -60,13 +71,14 @@
 #'        a good idea to include a prior for any species for which this is estimated.
 #' @param fit_EE Character-vector listing \code{taxa} for which ecotrophic
 #'        efficiency is estimated.
-#' @param log_prior A user-provided function that takes as input the list of
+#' @param log_prior A list of sampling statements representing parameter priors, or a
+#'        user-provided function that takes as input the list of
 #'        parameters \code{out$obj$env$parList()} where \code{out} is the output from
 #'        \code{ecostate()}, and returns a numeric vector
 #'        where the sum is the log-prior probability.  For example
 #'        \code{log_prior = function(p) dnorm( p$logq_i[1], mean=0, sd=0.1, log=TRUE)}
 #'        specifies a lognormal prior probability for the catchability coefficient
-#'        for the first \code{taxa} with logmean of zero and logsd of 0.1
+#'        for the first \code{taxa} with logmean of zero and logsd of 0.1. See \code{\link{evaluate_prior}} for details.
 #' @param control Output from [ecostate_control()], used to define user
 #'        settings.
 #' @param settings Output from [stanza_settings()], used to define age-structured
@@ -74,7 +86,7 @@
 #'
 #' @importFrom TMB config
 #' @importFrom checkmate assertDouble assertFactor assertCharacter assertList
-#' @importFrom stats dnorm nlminb optimHess weighted.mean
+#' @importFrom stats dnorm nlminb optimHess weighted.mean rgamma rmultinom rnorm
 #' @importFrom igraph graph_from_adjacency_matrix
 #' @importFrom ggplot2 ggplot aes
 #' @importFrom ggnetwork ggnetwork geom_edges geom_nodes geom_nodetext
@@ -139,9 +151,11 @@ function( taxa,
           fit_QB = vector(),
           fit_eps = vector(),
           fit_nu = vector(),
+          sem = "", 
+          covariates = NULL,
           log_prior = function(p) 0,
           settings = stanza_settings(taxa=taxa),
-          control = ecostate_control() ){
+          control = ecostate_control()){
   # importFrom RTMB MakeADFun REPORT ADREPORT sdreport getAll
   # importFrom Matrix Matrix Diagonal sparseMatrix
 
@@ -151,12 +165,23 @@ function( taxa,
 
   #
   start_time = Sys.time()
-  if( !all(c(fit_B,fit_Q,fit_B0,fit_eps,fit_EE) %in% taxa) ){
-    if(isFALSE(control$silent)) warning("Some `fit_B`, `fit_Q`, `fit_B0`, or `fit_eps` not in `taxa`")
+  if( !all(c(fit_B,fit_Q,fit_B0,fit_eps,fit_EE,fit_nu) %in% taxa) ){
+    if(isFALSE(control$silent)) warning("Some `fit_B`, `fit_Q`, `fit_B0`, `fit_eps`, or `fit_nu` not in `taxa`")
   }
   if( any(biomass$Mass==0) ) stop("`biomass$Mass` cannot include zeros, given the assumed lognormal distribution")
   if( any(catch$Mass==0) ) stop("`catch$Mass` cannot include zeros, given the assumed lognormal distribution")
 
+  # Set up inputs for SEM
+  use_sem <- nchar(trimws(sem)) > 0
+  if (isTRUE(use_sem)) {
+    sem_settings <- parse_ecostate_sem(
+      sem = sem, covariates = covariates, taxa = taxa, years = years, fit_eps = fit_eps, fit_nu = fit_nu, 
+      settings = settings, control = control
+    )
+  } else {
+    sem_settings <- list(model = sem)
+  }
+  
   # Set tmbad.sparse_hessian_compress
   config( tmbad.sparse_hessian_compress = control$tmbad.sparse_hessian_compress, DLL="RTMB" )
 
@@ -258,8 +283,7 @@ function( taxa,
   n_weight = length(Wobs_ta_g2)
 
   # parameter list
-  #browser()
-  p = list( delta_i = rep(log(1), n_species),
+  p = list( delta_i = setNames(rep(log(1), n_species), taxa),
             ln_sdB = log(0.1), 
             ln_sdC = log(0.1),
             logB_i = logB_i,
@@ -269,27 +293,30 @@ function( taxa,
             U_i = U_i,
             Xprime_ij = Xprime_ij,
             DC_ij = DC_ij,
-            logtau_i = rep(NA, n_species),
-            logsigma_i = rep(NA, n_species),
-            logpsi_g2 = rep(NA, settings$n_g2),
+            logtau_i = setNames(rep(NA, n_species), taxa),
+            logsigma_i = setNames(rep(NA, n_species), taxa),
+            logpsi_g2 = setNames(rep(NA, settings$n_g2), settings$unique_stanza_groups),
             epsilon_ti = array( 0, dim=c(0,n_species) ),
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
+            beta = if (use_sem && length(sem_settings$beta) > 0) sem_settings$beta else numeric(0),
+            mu = if (!is.null(covariates)) setNames(rep(0, ncol(covariates)), colnames(covariates)) else numeric(0),
+            covariates = numeric(0),
             logF_ti = array( log(0.01), dim=c(nrow(Bobs_ti),n_species) ),
-            logq_i = rep( log(1), n_species),
-            s50_z = rep(1, n_selex),
-            srate_z = rep(1, n_selex),
-            compweight_z = rep(1, n_selex*ifelse(settings$comp_weight=="multinom",0,1)),
+            logq_i = setNames(rep( log(1), n_species), taxa),
+            s50_z = setNames(rep(1, n_selex), names(Nobs_ta_g2)),
+            srate_z = setNames(rep(1, n_selex), names(Nobs_ta_g2)),
+            compweight_z = if (n_selex > 0 & settings$comp_weight != "multinom") rep(1, n_selex) else numeric(0),
             #selex_z = rep(1, n_selex),  # CHANGE WITH NUMBER OF PARAMETERS
-            log_winf_z = rep(0, n_weight),
-            ln_sdW_z = rep(0, n_weight),
+            log_winf_z = setNames(rep(0, n_weight), names(Wobs_ta_g2)),
+            ln_sdW_z = setNames(rep(0, n_weight), names(Wobs_ta_g2)),
             SpawnX_g2 = stanza_data$stanzainfo_g2z[,'SpawnX'],
             log_K_g2 = log(stanza_data$stanzainfo_g2z[,'K']),
             logit_d_g2 = qlogis(stanza_data$stanzainfo_g2z[,'d']),
             Wmat_g2 = stanza_data$stanzainfo_g2z[,'Wmat']
   )      # , PB_i=PB_i
-
+  
   # 
   map = list()
   
@@ -306,18 +333,33 @@ function( taxa,
   map$log_K_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_K, seq_len(settings$n_g2), NA)) #  factor( rep(NA,length(p$K_g2)) )
   map$logit_d_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_d, seq_len(settings$n_g2), NA)) #  factor( rep(NA,length(p$K_g2)) )
 
-  #
-  p$logtau_i = ifelse(taxa %in% fit_eps, log(control$start_tau), NA)
-  map$logtau_i = factor(ifelse(taxa %in% fit_eps, seq_len(n_species), NA))
+  # Process error SDs
+  if (use_sem) {
+    
+    if(!is.null(covariates)) map$mu = factor(seq_along(p$mu))
+    if(length(sem_settings$beta) > 0) map$beta = factor(seq_along(p$beta))
+    
+    # Map off process error SDs (redundant with SEM SD parameters)
+    p$logtau_i = rep(NA, n_species); map$logtau_i = factor(rep(NA, n_species))
+    p$logsigma_i = rep(NA, n_species); map$logsigma_i = factor(rep(NA, n_species))
+    p$logpsi_g2 = rep(NA, settings$n_g2); map$logpsi_g2 = factor(rep(NA, settings$n_g2))
+    
+  } else {
+    
+    # Standard deviation of biomass process errors
+    p$logtau_i = setNames(ifelse(taxa %in% fit_eps, log(control$start_tau), NA), taxa)
+    map$logtau_i = factor(ifelse(taxa %in% fit_eps, seq_len(n_species), NA))
+    
+    # Standard deviation of consumption process errors
+    p$logsigma_i = setNames(ifelse(taxa %in% fit_nu, log(control$start_tau), NA), taxa)
+    map$logsigma_i = factor(ifelse(taxa %in% fit_nu, seq_len(n_species), NA))
+    
+    # Standard deviation of recruitment process errors
+    p$logpsi_g2 = setNames(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA), settings$unique_stanza_groups)
+    map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, seq_len(settings$n_g2), NA))
+    
+  }
   
-  #
-  p$logsigma_i = ifelse(taxa %in% fit_nu, log(control$start_tau), NA)
-  map$logsigma_i = factor(ifelse(taxa %in% fit_nu, seq_len(n_species), NA))
-
-  #
-  p$logpsi_g2 = ifelse(settings$unique_stanza_groups %in% settings$fit_phi, log(control$start_tau), NA)
-  map$logpsi_g2 = factor(ifelse(settings$unique_stanza_groups %in% settings$fit_phi, seq_len(settings$n_g2), NA))
-
   # Catches
   map$logF_ti = factor( ifelse(is.na(Cobs_ti), NA, seq_len(prod(dim(Cobs_ti)))) )
   p$logF_ti[] = ifelse(is.na(Cobs_ti), -Inf, log(0.01))
@@ -328,48 +370,96 @@ function( taxa,
   # Initial biomass-ratio ... turn off if no early biomass observations
   map$delta_i = factor( ifelse(taxa %in% fit_B0, seq_along(p$delta_i), NA) )
   
-  # process errors
-  if( control$process_error == "epsilon" ){
-    p$epsilon_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
-    map$epsilon_ti = array( seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
-    for(i in seq_len(n_species)){
-      if( is.na(p$logtau_i[i]) ){
-        p$epsilon_ti[,i] = 0
-        map$epsilon_ti[,i] = NA
-      }
+  # Process errors
+  if (use_sem) {
+    
+    # Variation in biomass
+    p$epsilon_ti = array(0, dim=c(nrow(Bobs_ti), n_species) )
+    map$epsilon_ti = array(seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
+    if(any(grepl("eps_", sem_settings$proc_vars))) {
+      map$epsilon_ti[,-as.integer(na.omit(match(gsub("eps_", "", sem_settings$proc_vars), taxa)))] <- NA
+    } else {
+      map$epsilon_ti[,] <- NA
     }
     map$epsilon_ti = factor(map$epsilon_ti)
-  }else{
-    p$alpha_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
-    map$alpha_ti = array( seq_len(prod(dim(p$alpha_ti))), dim=dim(p$alpha_ti))
+    
+    # Variation in consumption
+    p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+    map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
+    if(any(grepl("nu_", sem_settings$proc_vars))) {
+      map$nu_ti[,-as.integer(na.omit(match(gsub("nu_", "", sem_settings$proc_vars), taxa)))] <- NA 
+    } else {
+      map$nu_ti[,] <- NA
+    }
+    map$nu_ti = factor(map$nu_ti)
+    
+    # Variation in recruitment
+    p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
+    map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
+    if(any(grepl("phi_", sem_settings$proc_vars))) {
+      map$phi_tg2[,-as.integer(na.omit(match(gsub("phi_", "", sem_settings$proc_vars), settings$unique_stanza_groups)))] <- NA
+    } else {
+      map$phi_tg2[,] <- NA
+    }
+    map$phi_tg2 = factor(map$phi_tg2)
+    
+    # Covariates
+    # Treat as fixed unless there are NAs, in which case, estimate missing values
+    if (!is.null(covariates)) {
+      p$covariates <- as.matrix(covariates)
+      p$covariates[is.na(p$covariates)] <- 0
+      map$covariates <- factor(c(ifelse(!is.na(covariates), NA, seq_along(covariates))))
+    }
+    
+  } else {
+    
+    if( control$process_error == "epsilon" ){
+      p$epsilon_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+      map$epsilon_ti = array( seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
+      for(i in seq_len(n_species)){
+        if( is.na(p$logtau_i[i]) ){
+          p$epsilon_ti[,i] = 0
+          map$epsilon_ti[,i] = NA
+        }
+      }
+      map$epsilon_ti = factor(map$epsilon_ti)
+    }else{
+      p$alpha_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+      map$alpha_ti = array( seq_len(prod(dim(p$alpha_ti))), dim=dim(p$alpha_ti))
+      for(i in seq_len(n_species)){
+        if( is.na(p$logtau_i[i]) ){
+          p$alpha_ti[,i] = 0
+          map$alpha_ti[,i] = NA
+        }
+      }
+      map$alpha_ti = factor(map$alpha_ti)
+    }
+    # Variation in consumption
+    p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
+    map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
     for(i in seq_len(n_species)){
-      if( is.na(p$logtau_i[i]) ){
-        p$alpha_ti[,i] = 0
-        map$alpha_ti[,i] = NA
+      if( is.na(p$logsigma_i[i]) ){
+        p$nu_ti[,i] = 0
+        map$nu_ti[,i] = NA
       }
     }
-    map$alpha_ti = factor(map$alpha_ti)
-  }
-  # Variation in consumption
-  p$nu_ti = array( 0, dim=c(nrow(Bobs_ti),n_species) )
-  map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
-  for(i in seq_len(n_species)){
-    if( is.na(p$logsigma_i[i]) ){
-      p$nu_ti[,i] = 0
-      map$nu_ti[,i] = NA
+    map$nu_ti = factor(map$nu_ti)
+    # Variation in recruitment
+    p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
+    map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
+    for(g2 in seq_len(settings$n_g2)){
+      if( is.na(p$logpsi_g2[g2]) ){
+        p$phi_tg2[,g2] = 0
+        map$phi_tg2[,g2] = NA
+      }
     }
+    map$phi_tg2 = factor(map$phi_tg2)
+    
   }
-  map$nu_ti = factor(map$nu_ti)
-  # Variation in recruitment
-  p$phi_tg2 = array( 0, dim=c(nrow(Bobs_ti),settings$n_g2) )
-  map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
-  for(g2 in seq_len(settings$n_g2)){
-    if( is.na(p$logpsi_g2[g2]) ){
-      p$phi_tg2[,g2] = 0
-      map$phi_tg2[,g2] = NA
-    }
-  }
-  map$phi_tg2 = factor(map$phi_tg2)
+  
+  # Set names
+  colnames(p$epsilon_ti) = colnames(p$alpha_ti) = colnames(p$nu_ti) = colnames(p$logF_ti) = taxa
+  colnames(p$phi_tg2) = settings$unique_stanza_groups
 
   # Measurement errors
   p$ln_sdB = log(0.1)
@@ -454,12 +544,12 @@ function( taxa,
   #environment(add_equilibrium) <- data3
 
   # Load data in environment for function "dBdt"
-  data4 = local({
-                  "c" <- ADoverload("c")
-                  "[<-" <- ADoverload("[<-")
-                  environment()
-  })
-  environment(log_prior) <- data4
+  # data4 = local({
+  #   "c" <- ADoverload("c")
+  #   "[<-" <- ADoverload("[<-")
+  #   environment()
+  # })
+  # environment(log_prior) <- data4
 
   # SEE ?RTMB::MakeADFun examples
   if( control$integration_method == "ABM"){
@@ -473,7 +563,7 @@ function( taxa,
   #}
   #cmb <- function(f, d) function(p) f(p, d) ## Helper to make closure
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
-  #
+  
   obj <- MakeADFun( func = cmb( compute_nll,
                                 Bobs_ti = Bobs_ti,
                                 Cobs_ti = Cobs_ti,
@@ -490,16 +580,16 @@ function( taxa,
                                 fit_nu = fit_nu,
                                 settings = settings,
                                 log_prior = log_prior,
-                                stanza_data = stanza_data,
-                                DC_ij = DC_ij ),
+                                #DC_ij = DC_ij,
+                                stanza_data = stanza_data, 
+                                sem = sem_settings$model),
                     parameters = p,
                     map = map,
                     random = control$random,
                     profile = control$profile,
                     silent = control$silent )
 
-  # Make TMB object
-  #browser()
+  # Make RTMB object
   # compute_nll(p)
   # environment(compute_nll) <- data
   #obj <- MakeADFun( func = compute_nll,
@@ -545,6 +635,32 @@ function( taxa,
   rep = obj$report()
   parhat = obj$env$parList()
 
+  #
+  simulator = function( parlist = parhat,   # can't have RHS of simulator = RHS of compute_nll
+                        simulate_random = TRUE ){
+    compute_nll( p = parlist,               # can't have RHS of simulator = RHS of compute_nll
+                Bobs_ti = Bobs_ti,
+                Cobs_ti = Cobs_ti,
+                Nobs_ta_g2 = Nobs_ta_g2,
+                Wobs_ta_g2 = Wobs_ta_g2,
+                noB_i = noB_i,
+                type_i = type_i,
+                n_species = n_species,
+                years = years,
+                taxa = taxa,
+                project_vars = project_vars,
+                control = control,
+                fit_eps = fit_eps,
+                fit_nu = fit_nu,
+                sem, 
+                settings = settings,
+                log_prior = log_prior,
+                stanza_data = stanza_data,
+                #DC_ij = DC_ij,
+                simulate_random = simulate_random,
+                simulate_data = TRUE )
+  }
+
   # Sanity checks
   if( any(rep$B_ti==0) ){
     warning("Some `B_ti=0` which typically occurs in multistanza models when W<Wmat for one or more years")
@@ -571,6 +687,38 @@ function( taxa,
   }else{
     hessian.fixed = sdrep = NULL
   }
+  
+  # SEM 
+  if (use_sem) {
+    
+    sem_out <- sem_settings$model[,c("path", "lag", "name")]
+    sem_out[,c("Type", "Estimate", "Std. Error")] <- NA
+    
+    off = which(sem_settings$model[,'parameter'] == 0)
+    if( length(off) > 0 ){
+      
+      sem_out[off, "Type"] = "Fixed"
+      sem_out[off, "Estimate"] = as.numeric(sem_settings$model[off,'start'])
+      
+    }
+    
+    not_off = which(sem_settings$model[,'parameter'] > 0)
+    if( length(not_off) > 0 ){
+      
+      sem_out[not_off, "Type"] = "Estimated"
+      sem_out[not_off, "Estimate"] = opt$par[which(names(opt$par) == "beta")][sem_settings$model[not_off, "parameter"]]
+      
+      if (isTRUE(control$getsd)) {
+        sem_out[not_off, "Std. Error"] = sqrt(diag(sdrep$cov.fixed))[which(names(opt$par) == "beta")][sem_settings$model[not_off, "parameter"]]
+      }
+      
+    }
+    
+  } else {
+   
+    sem_out <- NULL
+     
+  }
 
   #
   environment()
@@ -583,6 +731,7 @@ function( taxa,
     control = control,
     settings = settings,
     log_prior = log_prior,
+    stanza_data = stanza_data,
     Bobs_ti = Bobs_ti,
     Cobs_ti = Cobs_ti,
     Nobs_ta_g2 = Nobs_ta_g2,
@@ -608,10 +757,12 @@ function( taxa,
     rep = rep,
     sdrep = sdrep,
     derived = derived,
+    sem = sem_out,
     tmb_inputs = list(p=p, map=map),
     call = match.call(),
     run_time = Sys.time() - start_time,
-    internal = internal
+    internal = internal,
+    simulator = simulator
   )
 
   class(out) = "ecostate"
@@ -684,14 +835,14 @@ function( taxa,
 ecostate_control <-
 function( nlminb_loops = 1,
           newton_loops = 0,
-          eval.max = 1000,
-          iter.max = 1000,
+          eval.max = 5000,
+          iter.max = 5000,
           getsd = TRUE,
           silent = getOption("ecostate.silent", TRUE),
           trace = getOption("ecostate.trace", 0),
           verbose = getOption("ecostate.verbose", FALSE),
           profile = c("logF_ti","log_winf_z","s50_z","srate_z"),
-          random = c("epsilon_ti","alpha_ti","nu_ti","phi_tg2"),
+          random = c("epsilon_ti","alpha_ti","nu_ti","phi_tg2","covariates"),
           tmb_par = NULL,
           map = NULL,
           getJointPrecision = FALSE,
@@ -848,4 +999,11 @@ function( x,
     cat("\nEstimates: ")
     print(x$sdrep)
   }
+  
+  # Print SEM
+  if (!is.null(x$sem)) {
+    cat("\nSEM: \n")
+    print(x$sem)
+  }
+  
 }

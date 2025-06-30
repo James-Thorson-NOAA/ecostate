@@ -1,4 +1,5 @@
-# EcoState
+
+# ecostate <a href='https://github.com/James-Thorson-NOAA/ecostate'><img src='man/figures/logo.png' align="right" style="height:139px;"/></a>
 
 [![](https://www.r-pkg.org/badges/version/ecostate)](https://cran.r-project.org/package=ecostate)
 [![](https://cranlogs.r-pkg.org/badges/ecostate)](https://cran.r-project.org/package=ecostate)

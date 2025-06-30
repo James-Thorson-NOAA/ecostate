@@ -35,7 +35,7 @@ library(Rpath)
 
 ## Simulation demonstration
 
-We first simulate new data.  To do so, we specify a 5-species ecosystem:
+W begin by specifying parameters for a 5-species ecosystem:
 
 ```{r, echo=TRUE, message=FALSE, fig.width=7, fig.height=7}
 # Time-interval
@@ -46,7 +46,9 @@ n_years = length(years)
 taxa = c("Consumer_1", "Consumer_2", "Predator_1", "Predator_2", "Producer", "Detritus")
 n_species = length(taxa)
 
-# Ecopath-with-EcoSim parameters
+# Type for each taxon
+type_i = c( "hetero", "hetero", "hetero", "hetero", "auto", "detritus" )
+
 # Diet matrix
 DC_ij = matrix( c(
   0,     0,     0.8,  0.4,  0,   0,
@@ -56,107 +58,73 @@ DC_ij = matrix( c(
   0.9,   0.3,   0,    0,    0,   0,
   0.1,   0.7,   0,    0,    0,   0
 ), byrow=TRUE, ncol=n_species)
-PB_i = c( 4, 1, 0.2, 0.1, 90, 0.5 )         # Reciprocal of mean age according to Polovina-1984 ~= M
+
+# Reciprocal of mean age according to Polovina-1984 ~= M
+PB_i = c( 4, 1, 0.2, 0.1, 90, 0.5 )
+
+# Consumption per biomass for heterotrophcs
 QB_i = c( 10, 4, 3, 1, NA, NA )
+
+# Define ecotrophic efficiency or biomass for each taxon
 EE_i = c( 0.9, 0.9, NA, NA, 0.9, 0.9 )
 B_i = c( NA, NA, 1, 1, NA, NA )
+
+# Unassimulated food
 U_i = rep( 0.2, n_species )
-type_i = c( "hetero", "hetero", "hetero", "hetero", "auto", "detritus" )
-which_primary = which(type_i=="auto")
-which_detritus = which(type_i=="detritus")
+
+# Vulnerability matrix
 X_ij = matrix( 2, nrow=n_species, ncol=n_species )
-X_ij[,which_primary] = 91
+X_ij[,which(type_i=="auto")] = 91
+
+# Label EwE inputs for each taxon as expected (so users can easily change taxa)
+names(PB_i) = names(QB_i) = names(type_i) = names(U_i) = names(B_i) = names(EE_i) = taxa
+  dimnames(DC_ij) = dimnames(X_ij) = list("Prey"=taxa, "Predator"=taxa)
 ```
 
-We first define a function that simulates data, using the same functions for mass-balance and simulating dynamics are then used by EcoState during parameter estimation:
+We can then simulate data using the same functions for mass-balance and simulating dynamics are then used by EcoState during parameter estimation:
 
 ```{r, echo=TRUE, message=FALSE, fig.width=7, fig.height=7}
-simulate_data = function(){
-  # Simulate process errors
-  set.seed(101)
-  rarray = \(x,dims=dim(x),sd) array( sd*rnorm(prod(dims)), dim=dims )
-  epsilon_ti = rarray(dims=c(n_years,n_species),sd=1) * outer(rep(1,n_years),sigmaB_i)
-  
-  # Choose method to integrate instantaneous rates for annual dynamics
-  n_steps = 10
-  project_vars = abm3pc_sys
-  
-  # Define parameters
-  Pars = list( logB_i = log( B_i ), 
-                     logPB_i = log(PB_i),
-                     logQB_i = log(QB_i),
-                     Xprime_ij = log(X_ij - 1),
-                     EE_i = EE_i,
-                     DC_ij = DC_ij,
-                     U_i = U_i,
-                     type_i = type_i,
-                     noB_i = ifelse( is.na(B_i), 1, 0),
-                     epsilon_i = rep(0,n_species),
-                     logF_i = rep(-Inf,n_species) )
-                     #which_detritus = which_detritus,
-                     #which_primary = which_primary,
-                     #F_type = "integrated" )
-  Pars_full = add_equilibrium( Pars,
-                               scale_solver = "joint",
-                               noB_i = ifelse(is.na(Pars$logB_i),1,0),
-                               type_i = type_i )
+# Define Biomass for Taxon-Year combinations with survey data
+Biomass = cbind( expand.grid( "Year" = years,
+                           "Taxon" = taxa ),
+               "Mass" = 1 )
 
-  # Project forward
-  Bobs_ti = Cobs_ti = B_ti = C_ti = array( NA, dim=c(n_years,n_species), 
-                                    dimnames=list("Year"=years,"Taxon"=taxa) )
-  B_ti[1,] = exp(Pars_full$logB_i)
-  C_ti[1,] = NA
-  
-  for( t in seq_along(years)[-1] ){
-    # Fishing mortality ramps up for two predators
-    F_t = c( 0, 0, t/n_years*0.2, t/n_years*0.1, 0, 0 )
-  
-    #
-    pars_t = Pars_full
-    pars_t$logF_i = log(F_t)
-    pars_t$epsilon_i = epsilon_ti[t,]
-    pars_t$nu_i = rep(0,n_species)
+# Define catch for Taxon-Year combinations with a fishery
+Catch = subset( Biomass, Taxon %in% c("Predator_1","Predator_2") )
 
-    # Integrate dynamics annually
-    #data2 = local({
-    #                n_species = n_species
-    #                environment()
-    #})
-    #environment(dBdt) <- data2
-    sim = project_vars(
-          f = dBdt,
-          a = years[t-1], 
-          b = years[t],
-          n = n_steps,
-          Pars = pars_t,
-          type_i = type_i,
-          n_species = n_species,
-          F_type = "integrated",
-          y0 = c( B_ti[t-1,], rep(0,n_species) ) )
-    
-    # Record results
-    B_ti[t,] = sim$y[nrow(sim$y),seq_len(n_species)]
-    C_ti[t,] = sim$y[nrow(sim$y),n_species+seq_len(n_species)]
-  
-    # Simulate measurement errors
-    Bobs_ti[t,] = B_ti[t,] * exp(0.1*rnorm(n_species))
-    Cobs_ti[t,] = ifelse(C_ti[t,]==0,NA,C_ti[t,]) * exp(0.1*rnorm(n_species))
-  }
-  return( list( "B_ti"=B_ti, "C_ti"=C_ti, "Bobs_ti"=Bobs_ti, 
-                "Cobs_ti"=Cobs_ti, "Pars_full"=Pars_full) )
-}
+# Build the model object
+out = ecostate( taxa = taxa,
+                years = years,
+                catch = Catch,
+                biomass = Biomass,
+                PB = PB_i,
+                QB = QB_i,
+                DC = DC_ij,
+                B = B_i,
+                EE = EE_i,
+                X = X_ij,
+                type = type_i,
+                U = U_i,
+                control = ecostate_control( nlminb_loops = 0,
+                                            getsd = 0 ))
+
+# Edit the parameters used
+parlist = out$obj$env$parList()
+# Fishing mortality for Predator_1
+parlist$logF_ti[,3] = log( 0.2 * seq(0, 1, len=n_years) )
+# Fishing mortality for Predator_2
+parlist$logF_ti[,4] = log( 0.1 * seq(0, 1, len=n_years) )
+
+# print output to terminal
+sim = out$simulator( parlist = parlist )
 ```
+
 
 ## Comparison with Rpath
 
-We first compare the functions used by EcoState with existing implementations of the model.  One script-based implementation available in R is Rpath, and we therefore show the syntax and model-output for this comparison.  For this comparison, we first simulate a data set that does not have any process errors:
+We first compare the functions used by EcoState with existing implementations of the model.  One script-based implementation available in R is Rpath, and we therefore show the syntax and model-output for this comparison.
 
-```{r, echo=TRUE, message=FALSE, fig.width=7, fig.height=7}
-sigmaB_i = c(0, 0, 0, 0, 0, 0) # Taxa 1-2 crashes solver if sigmaB > 0.02
-sim = simulate_data()
-```
-
-We then load `Rpath` and reformat inputs in the format that it expects to calculate mass-balance:
+For this comparison, we first load `Rpath` and reformat inputs in the format that it expects to calculate mass-balance:
 
 ```{r, echo=TRUE, message=TRUE, fig.width=7, fig.height=7}
 # Rpath needs types in ascending order (EcoState doesn't care)
@@ -218,7 +186,9 @@ REco.sim$params$VV[which(REco.sim$params$PreyFrom==0 & REco.sim$params$PreyTo==5
 REco.run1 <- rsim.run(REco.sim, method = 'RK4', years = 1:40)
 ```
 
-Comparing the scenario forecasted with Rpath against the simulated time-series, we see that the two closely match.  EcoState uses the same functions during fitting, and so it also closely matches Rpath.  
+## Simulate using Ecostate
+
+Comparing the scenario forecasted with Rpath against the simulated time-series, we see that the two closely match.  EcoState uses the same functions during fitting, and so it also closely matches Rpath.
 
 ```{r, echo=TRUE, message=TRUE, fig.width=7, fig.height=7}
 # Calculate annual simulated catch
@@ -227,11 +197,11 @@ Bsim_ti = apply( REco.run1$out_Biomass[,-1], MARGIN=2, FUN=\(x) tapply(x,INDEX=Y
 
 #
 par(mfrow=c(2,1), mar=c(3,3,1,1), mgp=c(2,0.5,0) )
-matplot( x=years, y=Bsim_ti / outer(rep(1,n_years),Bsim_ti[1,]), 
+matplot( x=years, y=Bsim_ti / outer(rep(1,n_years),Bsim_ti[1,]),
          type="l", lwd=3, lty="solid", col=rainbow(n_species), log="y",
          ylab="Relative biomass (Rpath)", xlab="Year" )
 Brel_ti = sim$B_ti / outer(rep(1,n_years),sim$B_ti[1,])
-matplot( x=years, y=sim$B_ti / outer(rep(1,n_years),sim$B_ti[1,]), 
+matplot( x=years, y=sim$B_ti / outer(rep(1,n_years),sim$B_ti[1,]),
          type="l", lwd=3, lty="solid", col=rainbow(n_species), log="y",
          ylab="Relative biomass (Simulated)", xlab="Year" )
 legend("bottomleft", fill=rainbow(n_species), legend=taxa, ncol=2, bty="n")
@@ -239,18 +209,48 @@ legend("bottomleft", fill=rainbow(n_species), legend=taxa, ncol=2, bty="n")
 
 ## Fitting the model using EcoState
 
-We next want to show how EcoState performs when fitting to simulated data.  We simulate a data set that has process errors, and plot it to compare with the previous simulation that did not have process errors:
+We next want to show how EcoState performs when fitting to simulated data.  We first rebuild the model with process errors, and simulate new data
+
+and plot it to compare with the previous simulation that did not have process errors:
 
 ```{r, echo=TRUE, message=FALSE, fig.width=7, fig.height=7}
+# Build the model object
+out = ecostate( taxa = taxa,
+                years = years,
+                catch = Catch,
+                biomass = Biomass,
+                PB = PB_i,
+                QB = QB_i,
+                DC = DC_ij,
+                B = B_i,
+                EE = EE_i,
+                X = X_ij,
+                type = type_i,
+                U = U_i,
+                fit_eps = taxa,
+                control = ecostate_control( nlminb_loops = 0,
+                                            getsd = 0 ))
+
 # Simulate new data
-sigmaB_i = c(0.02, 0.02, 0.1, 0.1, 0.1, 0.1) # Taxa 1-2 crashes solver if sigmaB > 0.02
-sim = simulate_data()
+#sigmaB_i = c(0.02, 0.02, 0.1, 0.1, 0.1, 0.1) # Taxa 1-2 crashes solver if sigmaB > 0.02
+#sim = simulate_data()
+
+# Edit the parameters used
+parlist = out$obj$env$parList()
+# Fishing mortality for Predator_1
+parlist$logF_ti[,3] = log( 0.2 * seq(0, 1, len=n_years) )
+# Fishing mortality for Predator_2
+parlist$logF_ti[,4] = log( 0.1 * seq(0, 1, len=n_years) )
+# standard deviation for process errors in biomass dynamics
+parlist$logtau_i = log(c(0.02, 0.02, 0.1, 0.1, 0.1, 0.1))
+
+# print output to terminal
+sim = out$simulator( parlist = parlist )
 
 # Unload simulated data
 Bobs_ti = sim$Bobs_ti
 Cobs_ti = sim$Cobs_ti
 B_ti = sim$B_ti
-Pars_full = sim$Pars_full
 
 # Plot simulation with process errors
 matplot( x=years, y=B_ti / outer(rep(1,n_years),B_ti[1,]), 
@@ -262,8 +262,12 @@ We then reformat simulated biomass and catch time-series into long-form data fra
 
 ```{r, echo=TRUE, message=TRUE, fig.width=7, fig.height=7}
 # reformat to longform data-frame
-Catch = na.omit(data.frame(expand.grid(dimnames(Cobs_ti)), "Mass"=as.vector(Cobs_ti)))
-Biomass = na.omit(data.frame(expand.grid(dimnames(Bobs_ti)), "Mass"=as.vector(Bobs_ti)))
+Catch = na.omit( data.frame( expand.grid( "Year" = rownames(sim$Cobs_ti),
+                                          "Taxon" = colnames(sim$Cobs_ti)),
+                 "Mass"=as.vector(sim$Cobs_ti)))
+Biomass = data.frame( expand.grid( "Year" = rownames(sim$Bobs_ti),
+                                          "Taxon" = colnames(sim$Bobs_ti)),
+                 "Mass"=as.vector(sim$Bobs_ti))
 
 # Settings: specify what parameters to estimate
 fit_eps = c("Producer", "Detritus", "Predator_1", "Predator_2")   # process errors
@@ -272,13 +276,10 @@ fit_B0 = c()      # non-equilibrium initial condition
 fit_B = taxa       # equilibrium biomass
 
 # Solving for EE and giving uninformed initial values for biomass
-fittedB_i = exp(Pars_full$logB_i)
+fittedB_i = sim$Bobs_ti[1,]
 fittedEE_i = rep(NA, n_species)
+names(fittedB_i) = names(fittedEE_i) = taxa
 
-# Label EwE inputs for each taxon as expected (so users can easily change taxa)
-names(PB_i) = names(QB_i) = names(fittedB_i) = names(fittedEE_i) = names(type_i) = names(U_i) = taxa
-  dimnames(DC_ij) = dimnames(X_ij) = list("Prey"=taxa, "Predator"=taxa)
-  
 # Define priors
 log_prior = function(p){
   # Prior on process-error log-SD to stabilize model
@@ -322,7 +323,7 @@ Bhat_ti = out$derived$Est$B_ti
 Bse_ti = out$derived$SE$B_ti
 
 # Reformat to long-form data frame for ggplot
-results = expand.grid(dimnames(Bobs_ti))
+results = expand.grid( "Year" = years, "Taxon" = taxa )
 results = cbind( results, 
                  "True" = as.vector(B_ti),
                  "Est" = as.vector(Bhat_ti),

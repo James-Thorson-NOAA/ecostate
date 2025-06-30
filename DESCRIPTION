@@ -1,12 +1,19 @@
 Package: ecostate
 Type: Package
 Title: State-Space Mass-Balance Model for Marine Ecosystems
-Version: 0.2.0
-Date: 2024-11-15
+Version: 0.3.0
+Date: 2025-04-07
 Authors@R: c(
-    person(c("James", "T."), "Thorson", , "James.Thorson@noaa.gov", 
+    person(given = c("James", "T."), 
+	   family = "Thorson", 
+           email = "James.Thorson@noaa.gov", 
 	   role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0001-7415-1010"))
+           comment = c(ORCID = "0000-0001-7415-1010")),
+    person(given = c("Maurice", "C."), 
+	   family = "Goodman", 
+	   email = "maurice.goodman@noaa.gov", 
+           role = c("ctr"),
+	   comment = c("Added improved interface for priors, and DSEM interface for forcing functions as covariates"))
     )
 Maintainer: James T. Thorson <James.Thorson@noaa.gov>
 Description: 
@@ -26,13 +33,17 @@ Depends:
 Imports:
     TMB,
     MASS,
+    Matrix,
     checkmate,
     ggplot2,
     ggnetwork,
-    igraph
+    igraph, 
+    dsem, 
+    utils
 Suggests:
     knitr,
-    rmarkdown
+    rmarkdown, 
+    testthat
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 VignetteBuilder: knitr
