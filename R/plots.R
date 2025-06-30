@@ -130,11 +130,13 @@ plot_timeseries <- function(fit, taxa, observed = TRUE, interval = 0.95, q_adj =
   B_ti <- list(est = fit$derived$Est$B_ti)
   
   # Standard error
-  if (!is.null(fit$derived$SE$B_ti)) {
-    B_ti[["se"]] <- fit$derived$SE$B_ti
-  } else if (!isFALSE(interval)) {
-    message("`interval` is ignored when standard errors of derived quantities are missing")
-    interval <- FALSE
+  if (!isFALSE(interval)) {
+    if (!all(is.na(fit$derived$SE$B_ti))) {
+      B_ti[["se"]] <- fit$derived$SE$B_ti
+    } else {
+      message("`interval` is ignored when standard errors of derived quantities are missing")
+      interval <- FALSE
+    }
   }
   
   # Observed (survey) biomass
