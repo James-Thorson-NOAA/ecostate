@@ -57,7 +57,6 @@ function( p,
           control,
           simulate_data = FALSE,
           simulate_random = FALSE) {
-
   
   # Necessary in packages
   "c" <- ADoverload("c")
@@ -96,6 +95,7 @@ function( p,
     p_t$logF_i = rep(-Inf,n_species)
     p_t$nu_i = rep(0,n_species)
     p_t$phi_g2 = rep(0,settings$n_g2)
+    p_t$nu_ij <- matrix(0, nrow = n_species, ncol = n_species)
   out_initial = dBdt( Time = 1,
               State = c( exp(p$logB_i), rep(0,n_species)),
               Pars = p_t,
@@ -176,8 +176,13 @@ function( p,
       
       if (gsub("eps_", "", colnames(Xit)[i]) %in% taxa) {
         Xit[,i] <- p_t$epsilon_ti[,which(taxa %in% gsub("eps_", "", colnames(Xit)[i]))]
-      } else if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
-        Xit[,i] <- p_t$nu_ti[,which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))]
+      } else if (grepl("nu_", colnames(Xit)[i])) {
+        if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
+          Xit[,i] <- p_t$nu_ti[,which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))]
+        } else if (all(strsplit(gsub("nu_", "", colnames(Xit)[i]), ":")[[1]] %in% taxa)) {
+          pred_prey <- strsplit(gsub("nu_", "", colnames(Xit)[i]), ":")[[1]]
+          Xit[,i] <- p_t$nu_tij[, pred_prey[1], pred_prey[2]]
+        } 
       } else if (gsub("phi_", "", colnames(Xit)[i]) %in% settings$unique_stanza_groups) {
         Xit[,i] <- p_t$phi_tg2[,which(settings$unique_stanza_groups %in% gsub("phi_", "", colnames(Xit)[i]))]
       }
@@ -201,17 +206,20 @@ function( p,
       for (i in seq_len(ncol(Xit))) {
         if (gsub("eps_", "", colnames(Xit)[i]) %in% taxa) {
           epsilon_ti[, which(taxa %in% gsub("eps_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
-        } else if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
-          p$nu_ti[, which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
+        } else if (grepl("nu_", colnames(Xit)[i])) {
+          if (gsub("nu_", "", colnames(Xit)[i]) %in% taxa) {
+            p$nu_ti[, which(taxa %in% gsub("nu_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
+          } else if (all(strsplit(gsub("nu_", "", colnames(Xit)[i]), ":")[[1]] %in% taxa)) {
+            pred_prey <- strsplit(gsub("nu_", "", colnames(Xit)[i]), ":")[[1]]
+            p$nu_tij[, pred_prey[1], pred_prey[2]] <- Xit_sim[,i]
+          } 
         } else if (gsub("phi_", "", colnames(Xit)[i]) %in% settings$unique_stanza_groups) {
           p$phi_tg2[, which(settings$unique_stanza_groups %in% gsub("phi_", "", colnames(Xit)[i]))] <- Xit_sim[,i]
         } else if (colnames(Xit)[i] %in% colnames(p$covariates)) {
           p$covariates[,which(colnames(p$covariates) == colnames(Xit)[i])] <- Xit_sim[,i]
         }
       }
-      
     }
-    
   } else {
     for( i in seq_len(n_species) ){
       for( t in seq_len(nrow(Bobs_ti)) ){
@@ -254,6 +262,7 @@ function( p,
       p_t$epsilon_i = rep(0,n_species)
     }
     p_t$nu_i = p$nu_ti[t,]
+    p_t$nu_ij = p$nu_tij[t,,]
     p_t$phi_g2 = p$phi_tg2[t,]
 
     # RTMBode::ode requires y0 have names
@@ -611,6 +620,7 @@ function( p,
   if( isTRUE(simulate_data) ){
     out = list( epsilon_ti = epsilon_ti,
                 nu_ti = p$nu_ti,
+                nu_tij = p$nu_tij,
                 phi_tg2 = p$phi_tg2,
                 B_ti = B_ti,
                 Cobs_ti = Cobs_ti,

@@ -86,6 +86,32 @@ out0 <- ecostate(
   settings = settings, control = control
 )
 
+## Plot biomass fits --------------------------------------
+
+B_ti <- list(
+  observed = out0$internal$Bobs_ti, 
+  est = out0$derived$Est$B_ti, 
+  se = out0$derived$SE$B_ti
+)
+
+B_ti <- B_ti |> 
+  lapply(as.data.frame) |> 
+  lapply(\(x) {colnames(x) <- taxa; x}) |> 
+  lapply(\(x) {rownames(x) <- years; x}) |> 
+  lapply(rownames_to_column, var = "year") |> 
+  lapply(pivot_longer, cols = -year, names_to = "taxon") |> 
+  bind_rows(.id = "source") |> 
+  pivot_wider(names_from = "source", values_from = "value") |> 
+  mutate(year = as.integer(year))
+
+B_ti |> 
+  ggplot(aes(year)) + 
+  geom_ribbon(aes(ymin = est - se, ymax = est + se), alpha = 0.25) + 
+  geom_line(aes(y = est)) + 
+  geom_point(aes(y = observed)) + 
+  facet_wrap(~taxon, scales = "free_y")
+
+
 ## Loop over parameter grid, fit models -------------------
 
 n_reps <- 3

@@ -106,3 +106,104 @@ function( Q_ij,
   return(invisible(p))
 }
 
+#' Plot biomass time series from fitted ecostate model
+#'
+#' @param fit Fitted model object returned by `ecostate`
+#' @param taxa Taxon names to plot biomass for. If missing, defaults to all modeled taxa.
+#' @param observed Plot survey biomass for available taxa? Defaults to TRUE.
+#' @param interval Coverage of plotted confidence bands. Defaults to 0.95 (95%), omitted if FALSE.
+#' @param q_adj Where applicable, should estimates adjusted for catchability be plotted? Useful for 
+#'   assessing fit to survey data.
+#'
+#' @return invisibly return \code{ggplot} object for biomass time series
+#' @export
+plot_timeseries <- function(fit, taxa, observed = TRUE, interval = 0.95, q_adj = TRUE) {
+  
+  if (missing(taxa)) {
+    taxa <- fit$internal$taxa
+  } else if (!all(taxa %in% fit$internal$taxa)) {
+    stop(paste("taxa not in model:", paste(taxa[!(taxa %in% fit$internal$taxa)], collapse = ", ")))
+  }
+  
+  # Estimated biomass
+  if (is.null(fit$derived$Est$B_ti)) stop("No derived biomass estimates to plot")
+  B_ti <- list(est = fit$derived$Est$B_ti)
+  
+  # Standard error
+  if (!isFALSE(interval)) {
+    if (!all(is.na(fit$derived$SE$B_ti))) {
+      B_ti[["se"]] <- fit$derived$SE$B_ti
+    } else {
+      message("`interval` is ignored when standard errors of derived quantities are missing")
+      interval <- FALSE
+    }
+  }
+  
+  # Observed (survey) biomass
+  if (isTRUE(observed)) B_ti[["observed"]] <- fit$internal$Bobs_ti
+  
+  # Estimated biomass, adjusted using catchability
+  if (isTRUE(q_adj)) {
+    qmat <- outer(rep(1, length(fit$internal$years)), exp(fit$internal$parhat$logq_i))
+    qmat[qmat == 1] <- NA
+    B_ti[["est_q"]] = fit$derived$Est$B_ti * qmat
+  }
+  
+  # Convert all to long format
+  B_ti <- B_ti |> 
+    lapply(as.data.frame) |> 
+    lapply(function(x) {colnames(x) <- fit$internal$taxa; x}) |> 
+    lapply(function(x) {x$year <- fit$internal$years; x}) |>  
+    lapply(reshape, direction = "long", varying = fit$internal$taxa,
+      v.names = "biomass", times = fit$internal$taxa, timevar = "Taxon"
+    ) 
+  
+  # Join data frames
+  for (i in seq_along(B_ti)) names(B_ti[[i]])[names(B_ti[[i]]) == "biomass"] <- names(B_ti)[i]
+  B_ti <- Reduce(function(x, y) merge(x, y, c("year", "Taxon", "id")), B_ti)
+  
+  # Subset to specified taxa
+  B_ti <- B_ti[B_ti$Taxon %in% taxa, ]
+  
+  # Add confidence interval
+  if (!isFALSE(interval)) {
+    
+    checkmate::assert_number(interval)
+    if (!(interval > 0 & interval < 1)) stop("interval must be between 0 and 1")
+    
+    B_ti$se_log <- sqrt(log(1 + ((B_ti$se^2) / (B_ti$est^2))))
+    B_ti$est_log <- log(B_ti$est) - (0.5 * B_ti$se_log^2)
+    B_ti$lower <- qlnorm((1 - interval) / 2, meanlog = B_ti$est_log, sdlog = B_ti$se_log)
+    B_ti$upper <- qlnorm(1 - (1 - interval) / 2, meanlog = B_ti$est_log, sdlog = B_ti$se_log)
+    
+  }
+  
+  colors <- c("Bhat" = "black")
+  
+  # Plot estimate and interval
+  p <- B_ti |> 
+    ggplot2::ggplot(ggplot2::aes(year)) + 
+    {if (!isFALSE(interval)) ggplot2::geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.25, na.rm = TRUE)} + 
+    ggplot2::geom_line(ggplot2::aes(y = est, color = "Bhat"), na.rm = TRUE) + 
+    ggplot2::facet_wrap(~Taxon, scales = "free_y") + 
+    ggplot2::labs(y = "biomass", color = "source")
+  
+  # Plot estimate adjusted for catchability
+  if (isTRUE(q_adj)) {
+    colors <- c(colors, "Bhat * q" = "blue")
+    p <- p + ggplot2::geom_line(ggplot2::aes(y = est_q, color = "Bhat * q"), na.rm = TRUE) 
+  }
+  
+  # Plot survey data
+  if (isTRUE(observed)) {
+    colors <- c(colors, "Survey" = "black")
+    p <- p + ggplot2::geom_point(ggplot2::aes(y = observed, color = "Survey"), na.rm = TRUE)
+  }
+  
+  # Set colors
+  p <- p + ggplot2::scale_color_manual(values = colors)
+  
+  print(p)
+  return(invisible(p))
+  
+}
