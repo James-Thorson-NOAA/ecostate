@@ -1,10 +1,14 @@
-citHeader("For methodological details regarding EcoState, please see Thorson et al. (2014).")
+citHeader("For details regarding biomass dynamic in EcoState, please see Thorson, Kristensen, et al. (2025).
+           For details regarding multi-stanza features (age-structured dynamics), see Thorson, Aydin et al. (In press)")
 
 bibentry(bibtype = "Article",
            textVersion = "Thorson, J.  Kristensen, K., Aydin, K., Gaichas, S., Kimmel, D.G., McHuron, E.A., Nielsen, J.N., Townsend, H., Whitehouse, G.A. The Benefits of Hierarchical Ecosystem Models: Demonstration Using EcoState, a New State-Space Mass-Balance Model",
            title = "The Benefits of Hierarchical Ecosystem Models: Demonstration Using EcoState, a New State-Space Mass-Balance Model",
            journal = "Fish and Fisheries",
-           year = "2024",
+           volume = "26",
+           number = "2",
+           pages = "203-218",
+           year = "2025",
            doi = "10.1111/faf.12874",
            url = "https://doi.org/10.1111/faf.12874",
            author = c(person(given = c("J.", "T."),
@@ -25,3 +29,21 @@ bibentry(bibtype = "Article",
                              family = "Townsend"),
                       person(given = c("G.", "A."),
                              family = "Whitehouse")))
+
+bibentry(bibtype = "Article",
+           textVersion = "Thorson, J. T., Aydin, K. H., Cheng, M., Dias, B. S., Kimmel, D. G., & Kristensen, K. (In press). Bottom-up interactions in state-space age-structured models using mass-balance dynamics. Fish and Fisheries.",
+           title = "Bottom-up interactions in state-space age-structured models using mass-balance dynamics",
+           journal = "Fish and Fisheries",
+           year = "In press",
+           author = c(person(given = c("J.", "T."),
+                             family = "Thorson"),
+                      person(given = c("K."),
+                             family = "Aydin"),
+                      person(given = c("M."),
+                             family = "Cheng"),
+                      person(given = c("B."),
+                             family = "Dias"),
+                      person(given = c("D.", "G."),
+                             family = "Kimmel"),
+                      person(given = c("K."),
+                             family = "Kristensen")))
