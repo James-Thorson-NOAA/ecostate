@@ -32,7 +32,10 @@ Imports:
     igraph
 Suggests:
     knitr,
-    rmarkdown
+    rmarkdown,
+    lanczosRTMB
+Remotes:
+    James-Thorson/lanczosRTMB
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 VignetteBuilder: knitr

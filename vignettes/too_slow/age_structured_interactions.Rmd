@@ -24,10 +24,6 @@ start_time = Sys.time()
 ```
 
 ```{r setup, echo=TRUE, message=FALSE}
-# Install package for vignette (not on CRAN)
-install.packages("remotes")
-remotes::install_github("james-thorson/lanczosRTMB")
-
 # Load packages
 library(ecostate)
 library(lanczosRTMB)
@@ -260,7 +256,7 @@ opt = newton_CG(
 If useful, we can also approximate the marginal likelihood.  However, it is again to memory intensive for this demo:
 
 ```{r, eval = FALSE}
-nll = lanczos_nll(
+lanczos_nll(
   obj = out$obj,
   k = 30,
   m = 3
