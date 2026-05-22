@@ -24,7 +24,13 @@ start_time = Sys.time()
 ```
 
 ```{r setup, echo=TRUE, message=FALSE}
+# Install package for vignette (not on CRAN)
+install.packages("remotes")
+remotes::install_github("james-thorson/lanczosRTMB")
+
+# Load packages
 library(ecostate)
+library(lanczosRTMB)
 ```
 
 `ecostate` is an R package for fitting the mass-balance dynamics specified by EcoSim as a state-space model.  It can also incorporate age-structured dynamics for selected multi-stanza groups, and fit to age-composition and weight-at-age data for these age-structured populations.  Here, we show the format for this using data from the Gulf of Alaska.  
@@ -223,6 +229,41 @@ out = ecostate(
     comp_weight = "multinom",
     Leading = Leading,
     Wmatslope = Wmatslope )
+)
+```
+
+Alternatively, we could fit the model using a custom-build optimizer, although it is memory expensive so we disable it here:
+
+```{r, eval = FALSE}
+# Extract elements
+tape = GetTape(out$obj)
+tape$simplify(); tape$reorder
+gr = tape$jacfun()
+gr$simplify(); gr$reorder
+Hq = make_Hq( 
+  tape, 
+  x0 = out$obj$par,
+  method = "sparse"
+)
+
+# Refit with lanczosRTMB 
+opt = newton_CG(
+  par = out$obj$par,
+  fn = tape,
+  gr = gr,
+  Hq = Hq,
+  ustep = 0.01,
+  maxit_newton = 1e4
+)
+```
+
+If useful, we can also approximate the marginal likelihood.  However, it is again to memory intensive for this demo:
+
+```{r, eval = FALSE}
+nll = lanczos_nll(
+  obj = out$obj,
+  k = 30,
+  m = 3
 )
 ```
 
