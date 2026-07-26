@@ -473,30 +473,35 @@ function( taxa,
   #}
   #cmb <- function(f, d) function(p) f(p, d) ## Helper to make closure
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
+  func = cmb(
+    f = compute_nll,
+    Bobs_ti = Bobs_ti,
+    Cobs_ti = Cobs_ti,
+    Nobs_ta_g2 = Nobs_ta_g2,
+    Wobs_ta_g2 = Wobs_ta_g2,
+    noB_i = noB_i,
+    type_i = type_i,
+    n_species = n_species,
+    years = years,
+    taxa = taxa,
+    project_vars = project_vars,
+    control = control,
+    fit_eps = fit_eps,
+    fit_nu = fit_nu,
+    settings = settings,
+    log_prior = log_prior,
+    #DC_ij = DC_ij,
+    stanza_data = stanza_data
+  )
   #
-  obj <- MakeADFun( func = cmb( compute_nll,
-                                Bobs_ti = Bobs_ti,
-                                Cobs_ti = Cobs_ti,
-                                Nobs_ta_g2 = Nobs_ta_g2,
-                                Wobs_ta_g2 = Wobs_ta_g2,
-                                noB_i = noB_i,
-                                type_i = type_i,
-                                n_species = n_species,
-                                years = years,
-                                taxa = taxa,
-                                project_vars = project_vars,
-                                control = control,
-                                fit_eps = fit_eps,
-                                fit_nu = fit_nu,
-                                settings = settings,
-                                log_prior = log_prior,
-                                #DC_ij = DC_ij,
-                                stanza_data = stanza_data ),
-                    parameters = p,
-                    map = map,
-                    random = control$random,
-                    profile = control$profile,
-                    silent = control$silent )
+  obj <- MakeADFun(
+    func = func,
+    parameters = p,
+    map = map,
+    random = control$random,
+    profile = control$profile,
+    silent = control$silent
+  )
 
   # Make RTMB object
   #browser()
@@ -634,7 +639,7 @@ function( taxa,
     rep = rep,
     sdrep = sdrep,
     derived = derived,
-    tmb_inputs = list(p=p, map=map),
+    tmb_inputs = list(p=p, map=map, func=func),
     call = match.call(),
     run_time = Sys.time() - start_time,
     internal = internal,
