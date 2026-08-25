@@ -283,4 +283,4 @@ sst_fit <- ecostate(
   log_prior = log_prior, settings = settings_dgmrf, control = sst_ctrl
 )
 
-plot()
+plot() 

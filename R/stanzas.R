@@ -1,10 +1,15 @@
 
+#' @title Format stanza data
+#' @param settings list of stanza settings returned by \code{stanza_settings}
+#'
+#' @returns list
+#' @noRd
 make_stanza_data <-
 function( settings ){
 
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
   # Indexing
   s_s2 = match(names(settings$stanza_groups), settings$taxa)
   n_s2 = length(s_s2)
@@ -88,8 +93,8 @@ function( W,
           Wmatslope ){
 
   # Globals
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
 
   #pos = function(x){
   #  "c" <- ADoverload("c")
@@ -101,33 +106,37 @@ function( W,
     out = W - Wmat
     out = 0.5 * ( abs(out) + out )
   }else{
-    out = plogis( (W - Wmat) * Wmatslope ) * W
+    out = RTMB::plogis( (W - Wmat) * Wmatslope ) * W
   }
   return(out)
 }
 
 
-#' @title
-#' Compute state-varaibles for multi-stanza groups
+#' @title Compute state-variables for multi-stanza groups
+#' @param p list of parameters
+#' @param stanza_data list of stanza data returned by \code{make_stanza_data}
+#' @param settings list of stanza settings returned by \code{stanza_settings}
 #'
 #' @description
 #' Taking parameters, settings, and output from `make_stanza_dat,
 #' initialize the equilibrium (SplitAlpha) and initial state-variables
 #' for multi-stanza groups
+#' 
+#' @noRd
 add_stanza_params <-
 function( p,
           stanza_data,
           settings ){
 
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
 
   n_s2 = stanza_data$n_s2
   n_g2 = stanza_data$n_g2
   Amat_g2 = stanza_data$stanzainfo_g2z[,'Amat']
   Wmatslope_g2 = stanza_data$stanzainfo_g2z[,'Wmatslope']
-  d_g2 = plogis( p$logit_d_g2 )
+  d_g2 = RTMB::plogis( p$logit_d_g2 )
   inv1minus_d_g2 = 1 / (1 - d_g2)
   #Wmat_g2 = exp(p$log_winf_z[1]) * stanza_data$stanzainfo_g2z[,'Wmat']
   plusage_g2 = stanza_data$stanzainfo_g2z[,'plusage']
@@ -269,8 +278,8 @@ function( p,
           STEPS_PER_YEAR = 1 ){
 
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
   # Globals
   vbm_g2 = (1 - 3 * stanza_data$stanzainfo_g2z[,'K'] / STEPS_PER_YEAR)       # 3*K = k, where k is from dW = H*W^d - k*W
   #SB_g2 = exp(p$logPB_i)[stanza_data$stanzainfo_s2z[,'s']] # Get it to be class-advector
@@ -284,7 +293,7 @@ function( p,
   #X_zz = stanza_data$X_zz
   X_zz_g2 = stanza_data$X_zz_g2
   #d_g2 = stanza_data$stanzainfo_g2z[,'d']
-  d_g2 = plogis( p$logit_d_g2 )
+  d_g2 = RTMB::plogis( p$logit_d_g2 )
 
   # Replace Wmat with Amat if available
   #which_replace = which(!is.na(Amat_g2))
@@ -303,8 +312,8 @@ function( p,
     fmax(logx, logy) + log1p(exp(-abs(logx - logy)))
   }
   increase_vector = function(vec, plus_group="average"){
-    "c" <- ADoverload("c")  # Necessary in packages
-    "[<-" <- ADoverload("[<-")
+    "c" <- RTMB::ADoverload("c")  # Necessary in packages
+    "[<-" <- RTMB::ADoverload("[<-")
     out = c( 0, vec[-length(vec)] )
     if(plus_group=="add"){
       out[length(out)] = out[length(out)] + vec[length(out)]
@@ -400,8 +409,8 @@ function( stanza_data,
   # Loop through stanza-variables
   what = match.arg(what)
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
 
   Y_s2 = rep(0, stanza_data$n_s2)
   #X_zz = stanza_data$X_zz
@@ -436,8 +445,8 @@ function( p,
           STEPS_PER_YEAR ){
 
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
 
   xset = seq( 1, nrow(y), length=STEPS_PER_YEAR+1)
   xset = round( rowMeans(cbind(xset[-length(xset)],xset[-1])) )
@@ -451,9 +460,13 @@ function( p,
   for( STEP in seq_len(STEPS_PER_YEAR) ){
     # Load back in for update
     p$Y_zz_g2 = Y_zz_g2
+    B_s2_step = get_stanza_total( stanza_data = stanza_data,
+                                  Y_zz_g2 = Y_zz_g2 )
+    state_step = y[xset[STEP],]
+    state_step[stanza_data$stanzainfo_s2z[,'s']] = B_s2_step
     # Get food gain
     dBdt_step = dBdt( Time = 0,
-              State = y[xset[STEP],],
+              State = state_step,
               #State = out$B_g2
               type_i = type_i,
               n_species = n_species,
@@ -575,8 +588,8 @@ function( taxa,
           comp_weight = c("multinom","dir","dirmult") ){
 
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
 
   #
   comp_weight = match.arg(comp_weight)

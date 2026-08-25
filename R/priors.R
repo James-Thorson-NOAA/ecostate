@@ -34,8 +34,8 @@
 #' 
 evaluate_prior <- function(priors, p) {
   
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
   
   if (length(p$beta) > 0) { 
     for (i in seq_along(p$beta)) {

@@ -75,6 +75,8 @@ parse_ecostate_sem <- function(sem, covariates, taxa, years, fit_eps, fit_nu, se
       x_out[,x_vars[i]] <- covariates[match(years, rownames(covariates)),x_vars[i]]
     }
     covariates <- x_out
+  } else {
+    covariates <- array(dim = c(length(years), 0), dimnames = list(years, NULL))
   }
   
   # Unique parameters to be estimated

@@ -173,8 +173,8 @@ function( taxa,
   # importFrom Matrix Matrix Diagonal sparseMatrix
   
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
 
   #
   start_time = Sys.time()
@@ -198,6 +198,7 @@ function( taxa,
   } else {
     
     sem_settings <- list(model = sem)
+    covariates <- array(dim = c(length(years), 0), dimnames = list(years, NULL))
     
   }
   
@@ -224,11 +225,32 @@ function( taxa,
     )
     
     future$Frate[is.na(future$Frate)] <- 0
+    
+    if (any(catch$Year %in% future$extra_years)) {
+      message("ignoring catches in projection period")
+      catch <- catch[catch$Year %in% years, ]
+    }
+    
+    if (any(biomass$Year %in% future$extra_years)) {
+      message("ignoring observed biomass in projection period")
+      biomass <- biomass[biomass$Year %in% years, ]
+    }
       
   } else {
     
     years_all <- years
     
+  }
+
+  # If not using SEM, process errors for future time points are 
+  # random effects, so process error arrays have rows for all years
+  # If using SEM, process errors for future time points are derived from 
+  # standard normal random effects and conditional GMRF mean / precision, 
+  # so process error arrays have rows for only some historical years
+  if (isTRUE(use_sem)) {
+    par_years <- years
+  } else {
+    par_years <- years_all
   }
   
   # Set tmbad.sparse_hessian_compress
@@ -263,6 +285,11 @@ function( taxa,
   
   type_i = type[taxa]
   
+  # Indicators 
+  which_primary = which( type_i=="auto" )
+  which_detritus = which( type_i=="detritus" )
+  which_multigroup = match( settings$multigroup_taxa, settings$taxa )
+
   # Deal with V
   if(missing(X)){
     X_ij = array(2, dim=c(n_species,n_species), dimnames=list(taxa,taxa))
@@ -281,10 +308,6 @@ function( taxa,
   assertDouble( U_i, len=n_species, any.missing=FALSE, upper=1 )      # GE = 1-U-A and A>=0 so GE <= 1-U so GE+U <= 1
 
   #noB_i = rep(0,n_species)
-  # Indicators 
-  which_primary = which( type_i=="auto" )
-  which_detritus = which( type_i=="detritus" )
-  which_multigroup = match( settings$multigroup_taxa, settings$taxa )
   noB_i = ifelse( is.na(logB_i), 1, 0 )
   noB_i[which_multigroup] = 0
 
@@ -398,11 +421,11 @@ function( taxa,
             epsilon_ti = array( 0, dim=c(0,n_species) ),
             alpha_ti = array( 0, dim=c(0,n_species) ),
             nu_ti = array( 0, dim=c(0,n_species) ),
-            nu_tij = array(0, dim = c(length(years_all), n_species, n_species)),
+            nu_tij = array(0, dim = c(length(par_years), n_species, n_species)),
             phi_tg2 = array( 0, dim=c(0,settings$n_g2) ),
             beta = if (use_sem && length(sem_settings$beta) > 0) sem_settings$beta else numeric(0),
-            mu = if (!is.null(covariates)) setNames(rep(0, ncol(covariates)), colnames(covariates)) else numeric(0),
-            covariates = numeric(0),
+            mu = if (ncol(covariates)) setNames(rep(0, ncol(covariates)), colnames(covariates)) else numeric(0),
+            covariates = covariates,
             logF_ti = array( log(0.01), dim=c(length(years_all),n_species) ),
             logq_i = setNames(rep( log(1), n_species), taxa),
             s50_z = setNames(rep(1, n_selex), names(Nobs_ta_g2)),
@@ -413,7 +436,7 @@ function( taxa,
             ln_sdW_z = setNames(rep(0, n_weight), names(Wobs_ta_g2)),
             SpawnX_g2 = stanza_data$stanzainfo_g2z[,'SpawnX'],
             log_K_g2 = log(stanza_data$stanzainfo_g2z[,'K']),
-            logit_d_g2 = qlogis(stanza_data$stanzainfo_g2z[,'d']),
+            logit_d_g2 = RTMB::qlogis(stanza_data$stanzainfo_g2z[,'d']),
             Wmat_g2 = stanza_data$stanzainfo_g2z[,'Wmat']
   )      # , PB_i=PB_i
   
@@ -436,7 +459,7 @@ function( taxa,
   # Process error SDs
   if (use_sem) {
     
-    if(!is.null(covariates)) {
+    if(ncol(covariates)) {
       if (isFALSE(control$estimate_mu)) {
         map$mu = factor(rep(NA, length(p$mu)))
       } else if (!isTRUE(control$estimate_mu)) {
@@ -480,21 +503,8 @@ function( taxa,
   # Initial biomass-ratio ... turn off if no early biomass observations
   map$delta_i = factor( ifelse(taxa %in% fit_B0, seq_along(p$delta_i), NA) )
   
-  # Future covariates and fishing mortality rate
+  # Future fishing mortality rate
   if (length(future$extra_years)) {
-    
-    # Expand covariates matrix
-    covariates <- rbind(
-      covariates, 
-      matrix(NA, nrow = length(future$extra_years), ncol = ncol(sem_settings$covariates), 
-             dimnames = list(future$extra_years, colnames(sem_settings$covariates)))
-    )
-    
-    # Add in fixed future covariates
-    for (i in seq_along(colnames(future$covariates))) {
-      covariates[rownames(future$covariates), colnames(future$covariates)[i]] <- 
-        future$covariates[,colnames(future$covariates)[i]]
-    }
     
     # Future fishing mortality rate
     for (i in seq_along(colnames(future$Frate))) {
@@ -505,10 +515,10 @@ function( taxa,
   }
   
   # Process errors
-  if (use_sem) {
+  if (isTRUE(use_sem)) {
     
     # Variation in biomass
-    p$epsilon_ti = array(0, dim=c(length(years_all), n_species) )
+    p$epsilon_ti = array(0, dim=c(length(par_years), n_species) )
     map$epsilon_ti = array(seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
     if(any(grepl("eps_", sem_settings$proc_vars))) {
       map$epsilon_ti[,-as.integer(na.omit(match(gsub("eps_", "", sem_settings$proc_vars), taxa)))] <- NA
@@ -518,7 +528,7 @@ function( taxa,
     map$epsilon_ti = factor(map$epsilon_ti)
     
     # Variation in consumption by predator
-    p$nu_ti = array( 0, dim=c(length(years_all),n_species) )
+    p$nu_ti = array( 0, dim=c(length(par_years),n_species) )
     map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
     if(any(grepl("nu_", sem_settings$proc_vars) & !(grepl(":", sem_settings$proc_vars)))) {
       map$nu_ti[,-as.integer(na.omit(match(gsub("nu_", "", sem_settings$proc_vars), taxa)))] <- NA
@@ -540,7 +550,7 @@ function( taxa,
     map$nu_tij = factor(map$nu_tij)
     
     # Variation in recruitment
-    p$phi_tg2 = array( 0, dim=c(length(years_all),settings$n_g2) )
+    p$phi_tg2 = array( 0, dim=c(length(par_years),settings$n_g2) )
     map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
     if(any(grepl("phi_", sem_settings$proc_vars))) {
       map$phi_tg2[,-as.integer(na.omit(match(gsub("phi_", "", sem_settings$proc_vars), settings$unique_stanza_groups)))] <- NA
@@ -551,7 +561,7 @@ function( taxa,
     
     # Covariates
     # Treat as fixed unless there are NAs, in which case, estimate missing values
-    if (!is.null(covariates)) {
+    if (ncol(covariates)) {
       p$covariates <- as.matrix(covariates)
       p$covariates[is.na(p$covariates)] <- 0
       map$covariates <- factor(c(ifelse(!is.na(covariates), NA, seq_along(covariates))))
@@ -560,7 +570,7 @@ function( taxa,
   } else {
     
     if( control$process_error == "epsilon" ){
-      p$epsilon_ti = array( 0, dim=c(length(years_all),n_species) )
+      p$epsilon_ti = array( 0, dim=c(length(par_years),n_species) )
       map$epsilon_ti = array( seq_len(prod(dim(p$epsilon_ti))), dim=dim(p$epsilon_ti))
       for(i in seq_len(n_species)){
         if( is.na(p$logtau_i[i]) ){
@@ -570,7 +580,7 @@ function( taxa,
       }
       map$epsilon_ti = factor(map$epsilon_ti)
     }else{
-      p$alpha_ti = array( 0, dim=c(length(years_all),n_species) )
+      p$alpha_ti = array( 0, dim=c(length(par_years),n_species) )
       map$alpha_ti = array( seq_len(prod(dim(p$alpha_ti))), dim=dim(p$alpha_ti))
       for(i in seq_len(n_species)){
         if( is.na(p$logtau_i[i]) ){
@@ -581,7 +591,7 @@ function( taxa,
       map$alpha_ti = factor(map$alpha_ti)
     }
     # Variation in consumption
-    p$nu_ti = array( 0, dim=c(length(years_all),n_species) )
+    p$nu_ti = array( 0, dim=c(length(par_years),n_species) )
     map$nu_ti = array( seq_len(prod(dim(p$nu_ti))), dim=dim(p$nu_ti))
     map$nu_tij =  factor(rep(NA, length(c(p$nu_tij))))
     for(i in seq_len(n_species)){
@@ -592,7 +602,7 @@ function( taxa,
     }
     map$nu_ti = factor(map$nu_ti)
     # Variation in recruitment
-    p$phi_tg2 = array( 0, dim=c(length(years_all),settings$n_g2) )
+    p$phi_tg2 = array( 0, dim=c(length(par_years),settings$n_g2) )
     map$phi_tg2 = array( seq_len(prod(dim(p$phi_tg2))), dim=dim(p$phi_tg2))
     for(g2 in seq_len(settings$n_g2)){
       if( is.na(p$logpsi_g2[g2]) ){
@@ -605,10 +615,10 @@ function( taxa,
   }
   
   # Set names
-  dimnames(p$epsilon_ti) <- dimnames(p$nu_ti) <- list(years_all, taxa)
-  if (control$process_error == "alpha") dimnames(p$alpha_ti) <- list(years_all, taxa)
-  dimnames(p$phi_tg2) <- list(years_all, settings$unique_stanza_groups)
-  dimnames(p$nu_tij) <- list(year = years_all, predator = taxa, prey = taxa)
+  dimnames(p$epsilon_ti) <- dimnames(p$nu_ti) <- list(par_years, taxa)
+  if (control$process_error == "alpha") dimnames(p$alpha_ti) <- list(par_years, taxa)
+  dimnames(p$phi_tg2) <- list(par_years, settings$unique_stanza_groups)
+  dimnames(p$nu_tij) <- list(year = par_years, predator = taxa, prey = taxa)
 
   # Measurement errors
   p$ln_sdB = log(0.1)
@@ -619,6 +629,38 @@ function( taxa,
   # Fix biomass for primary producers .... seems to be stiff if trying to fix more than one variable
   map$logB_i = factor( ifelse(taxa %in% fit_B, seq_len(n_species), NA) )
   map$EE_i = factor( ifelse(taxa %in% fit_EE, seq_len(n_species), NA) )
+  
+  # Set z_fut parameter for derived future process errors (DSEM)
+  n_z_fut <- 0
+  if (use_sem && length(future$extra_years) > 0) {
+    variables <- unique(c(sem_settings$model$first, sem_settings$model$second))
+    Xit_cond <- matrix(NA, nrow = length(years_all), ncol = length(variables), 
+                       dimnames = list(years_all, variables))
+    Xit_cond[as.character(future$extra_years), ] <- NA
+    if (!is.null(future$covariates) && ncol(future$covariates) > 0) {
+      common_cols <- intersect(colnames(future$covariates), colnames(Xit_cond))
+      for (col in common_cols) {
+        non_na_years <- rownames(future$covariates)[!is.na(future$covariates[, col])]
+        non_na_years <- intersect(non_na_years, as.character(future$extra_years))
+        if (length(non_na_years) > 0) {
+          Xit_cond[non_na_years, col] <- 0
+        }
+      }
+    }
+    n_z_fut <- sum(is.na(Xit_cond[as.character(future$extra_years), , drop=FALSE]))
+  }
+  
+  p$z_fut <- rep(0, n_z_fut)
+  if (n_z_fut > 0) {
+    map$z_fut <- factor(seq_len(n_z_fut))
+  } else {
+    map$z_fut <- factor(numeric(0))
+  }
+
+  # If using marginal likelihood and projecting using DSEM, treat z_fut as random
+  if (n_z_fut > 0 && !all(is.na(map$z_fut)) && length(control$random) > 0) {
+    control$random <- union(control$random, "z_fut")
+  }
   
   # User-supplied parameters
   if( !is.null(control$tmb_par) ){
@@ -713,7 +755,7 @@ function( taxa,
   #cmb <- function(f, d) function(p) f(p, d) ## Helper to make closure
   cmb <- function(f, ...) function(p) f(p, ...) ## Helper to make closure
   
-  obj <- MakeADFun( func = cmb( compute_nll,
+  obj <- RTMB::MakeADFun( func = cmb( compute_nll,
                                 Bobs_ti = Bobs_ti,
                                 Cobs_ti = Cobs_ti,
                                 Nobs_ta_g2 = Nobs_ta_g2,
@@ -824,7 +866,7 @@ function( taxa,
     #                  fn = obj$fn, 
     #                  gr = obj$gr )
     hessian.fixed = get_hessian(obj=obj, par=opt$par)
-    sdrep = sdreport( obj,
+    sdrep = RTMB::sdreport( obj,
                       par.fixed = opt$par,
                       hessian.fixed = hessian.fixed,
                       getJointPrecision = control$getJointPrecision )
@@ -982,6 +1024,13 @@ function( taxa,
 #'        covariate means at zero), or a character vector (estimate a subset of
 #'        covariate means). Applicable if using centered / scaled covariates whose
 #'        means are known a-priori to be zero.
+#' @param dev_penalty If TRUE, the squared sum of each process error vector is added
+#'        to likelihood to penalize process errors with non-zero means, mimicking recdev
+#'        option 4 in Stock Synthesis. Applies only to the main model period; errors for
+#'        extra years supplied via the `future` argument are excluded. An equivalent penalty
+#'        can be added to specific error vectors by supplying `log_prior` with a function, where
+#'        e.g. `function(p) { logp <- logp - sum(p$epsilon_ti[,"cod"])^2 }` would penalize 
+#'        biomass deviates for a single species named "cod"
 #'
 #' @return
 #' An S3 object of class "ecostate_control" that specifies detailed model settings,
@@ -1011,8 +1060,10 @@ function( nlminb_loops = 1,
           inverse_method = c("Standard", "Penrose_moore"),
           tmbad.sparse_hessian_compress = 1,
           estimate_mu = TRUE,
+          dev_penalty = FALSE,
           #use_gradient = TRUE,
-          start_tau = 0.001 ){
+          start_tau = 0.001
+          ){
 
   #
   integration_method = match.arg(integration_method)
@@ -1046,6 +1097,7 @@ function( nlminb_loops = 1,
     tmbad.sparse_hessian_compress = tmbad.sparse_hessian_compress,
     use_gradient = TRUE,
     estimate_mu = estimate_mu,
+    dev_penalty = dev_penalty,
     start_tau = start_tau
   ), class = "ecostate_control" )
 }
@@ -1118,12 +1170,26 @@ function( x,
 #'
 #' @export
 logLik.ecostate <- function(object, ...) {
-  val = -1 * object$opt$objective
+
+  val = -1 * object$opt$objective 
   df = length( object$opt$par )
+
+  # Exclude future projection in log likelihood
+  # Only subtract loglik9_fut if z_fut was not integrated out as a random effect
+  is_random <- FALSE
+  if (!is.null(object$obj$env$random)) {
+    is_random <- "z_fut" %in% names(object$obj$env$par[object$obj$env$random])
+  }
+  if (!is_random) {
+    val = val - object$rep$loglik9_fut
+  }
+  df <- df - sum(names(object$opt$par) == "z_fut")  
+
   out = structure( val,
              df = df,
              class = "logLik")
   return(out)
+
 }
 
 #' @title Print fitted ecostate object

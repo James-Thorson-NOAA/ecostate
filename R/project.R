@@ -153,6 +153,10 @@ project <- function(
     stop("extra_years must be an integer sequence starting from the year following the last year in the model.")
   }
   
+  if (!is.null(model$internal$extra_years)) {
+    stop("`project` is mutually exclusive with `future` argument")
+  }
+
   # For unconditional past variance, resample all process errors and covariates
   if (isFALSE(parm_var) & past_var == "unconditional") {
     parsim <- model$simulator(parlist, simulate_random = TRUE)
@@ -237,6 +241,7 @@ project <- function(
     ctrl_new <- model$internal$control
     ctrl_new$nlminb_loops <- ctrl_new$newton_loops <- 0
     ctrl_new$getsd <- FALSE
+    ctrl_new$map <- ctrl_new$tmb_par <- NULL
     
     # Some objects needed to update the model are not returned by
     # ecostate(), or may not always evaluate correctly (e.g. values from call()). 
@@ -258,6 +263,8 @@ project <- function(
   par_new <- substitute_pars(par_new, parlist)
   
   # Predict random effects in future years conditional on fitted estimates
+  yr_ind <- seq_along(model$internal$years)
+  
   if (!is.null(model$sem)) {
     
     sem_path <- eval(model$call$sem, envir = parent.frame())
@@ -286,9 +293,7 @@ project <- function(
       Xit[,colnames(cov_full)] <- cov_full
       Xit[,colnames(cov_full)] <- sweep(Xit[,colnames(cov_full), drop = FALSE], 2, par_new$mu) 
     }
-    
-    yr_ind <- seq_along(model$internal$years)
-    
+        
     # Pull out process error values from matrices
     for (i in seq_len(ncol(Xit))) {
       

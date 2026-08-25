@@ -6,3 +6,4 @@ docs
 README.md
 *.tar.gz
 *.Rhistory
+.DS_Store

@@ -27,6 +27,7 @@ ecostate_control(
   inverse_method = c("Standard", "Penrose_moore"),
   tmbad.sparse_hessian_compress = 1,
   estimate_mu = TRUE,
+  dev_penalty = FALSE,
   start_tau = 0.001
 )
 }
@@ -61,7 +62,7 @@ passed to \code{\link[RTMB]{MakeADFun}}}
 \item{tmb_par}{list of parameters for starting values, with shape identical
 to \code{tinyVAST(...)$internal$parlist}}
 
-\item{map}{list of mapping values, passed to \link[RTMB:TMB-interface]{RTMB::MakeADFun}}
+\item{map}{list of mapping values, passed to \link[RTMB:MakeADFun]{RTMB::MakeADFun}}
 
 \item{getJointPrecision}{whether to get the joint precision matrix.  Passed
 to \code{\link[TMB]{sdreport}}.}
@@ -108,6 +109,14 @@ decrease in speed for model-fitting with a small model.}
 covariate means at zero), or a character vector (estimate a subset of
 covariate means). Applicable if using centered / scaled covariates whose
 means are known a-priori to be zero.}
+
+\item{dev_penalty}{If TRUE, the squared sum of each process error vector is added
+to likelihood to penalize process errors with non-zero means, mimicking recdev
+option 4 in Stock Synthesis. Applies only to the main model period; errors for
+extra years supplied via the \code{future} argument are excluded. An equivalent penalty
+can be added to specific error vectors by supplying \code{log_prior} with a function, where
+e.g. \code{function(p) { logp <- logp - sum(p$epsilon_ti[,"cod"])^2 }} would penalize
+biomass deviates for a single species named "cod"}
 
 \item{start_tau}{Starting value for the standard deviation of process errors}
 }

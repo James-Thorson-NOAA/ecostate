@@ -30,9 +30,9 @@ function( ecoparams,
           type_i ) { 
   
   # Necessary in packages
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
-  "diag<-" <- ADoverload("diag<-")                    
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
+  "diag<-" <- RTMB::ADoverload("diag<-")                    
   #require(Matrix)
 
   # Guidelines

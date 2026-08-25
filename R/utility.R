@@ -109,8 +109,8 @@ function( x,
           log=TRUE ){
 
   # Pre-processing
-  "c" <- ADoverload("c")
-  "[<-" <- ADoverload("[<-")
+  "c" <- RTMB::ADoverload("c")
+  "[<-" <- RTMB::ADoverload("[<-")
   Ntotal = sum(x)
   p_exp = prob / sum(prob)
   p_obs = x / Ntotal

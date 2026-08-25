@@ -13,7 +13,8 @@ plot_foodweb(
   taxa_labels = letters[seq_len(nrow(Q_ij))],
   xloc,
   yloc,
-  rescale = TRUE
+  rescale = TRUE,
+  ...
 )
 }
 \arguments{
@@ -36,6 +37,8 @@ plot_foodweb(
 
 \item{rescale}{whether to rescale flow and biomass as ratio relative to lowest value
 such that values are relative rather than absolute units}
+
+\item{...}{additional arguments to \code{ggnetwork::ggnetwork()}}
 }
 \value{
 invisibly return \code{ggplot} object for foodweb
@@ -53,4 +56,38 @@ Trophic level \eqn{l_i} for each predator \eqn{i} is defined as:
 where \eqn{\mathbf{Q*}} is the proportion consumption for each predator (column)
 of different prey (rows).  We identify primary producers as any taxa with no
 consumption (a column of 0s), and assign them as the first trophic level.
+}
+\examples{
+\dontrun{
+# Load data
+data(eastern_bering_sea)
+
+# Simple model estimating only Pollock biomass
+model <- with(eastern_bering_sea, ecostate(
+  taxa = taxa, 
+  years = years, 
+  catch = Catch, 
+  biomass = Survey, 
+  type = type_i, 
+  fit_B = "Pollock",
+  B = B_i, 
+  PB = P_over_B, 
+  QB = Q_over_B,
+  EE = EE_i, 
+  DC = Diet_proportions,
+  U = U_i, 
+  X = X_ij
+))
+
+# Plot using consumption at equilibrium Qe_ij
+# X-axis is proportion of production from Krill (pelagic production)
+plot_foodweb(
+  model$rep$out_initial$Qe_ij, 
+  xtracer_i = ifelse(eastern_bering_sea$taxa == "Krill", 1, 0), 
+  B_i = model$rep$out_initial$B_i, 
+  type_i = eastern_bering_sea$type_i,
+  taxa_labels = eastern_bering_sea$taxa
+)
+}
+
 }

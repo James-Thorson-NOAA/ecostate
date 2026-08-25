@@ -4,19 +4,29 @@
 \alias{plot_timeseries}
 \title{Plot biomass time series from fitted ecostate model}
 \usage{
-plot_timeseries(fit, taxa, observed = TRUE, interval = 0.95, q_adj = TRUE)
+plot_timeseries(
+  model,
+  taxa,
+  observed = TRUE,
+  interval = 0.95,
+  q_adj = TRUE,
+  dist = c("lognormal", "normal")
+)
 }
 \arguments{
-\item{fit}{Fitted model object returned by \code{ecostate}}
+\item{model}{Fitted model object returned by \code{ecostate}}
 
 \item{taxa}{Taxon names to plot biomass for. If missing, defaults to all modeled taxa.}
 
 \item{observed}{Plot survey biomass for available taxa? Defaults to TRUE.}
 
-\item{interval}{Coverage of plotted confidence bands. Defaults to 0.95 (95\%), omitted if FALSE.}
+\item{interval}{Coverage of plotted confidence bands. Can be a numeric value between 0 and 1,
+\code{NA} (or \code{FALSE}) for no interval, or \code{"SE"} for a +/- 1 SE interval. Defaults to 0.95.}
 
 \item{q_adj}{Where applicable, should estimates adjusted for catchability be plotted? Useful for
 assessing fit to survey data.}
+
+\item{dist}{Distribution assumption for biomass uncertainty. Either \code{"lognormal"} (default) or \code{"normal"}.}
 }
 \value{
 invisibly return \code{ggplot} object for biomass time series
